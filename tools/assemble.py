@@ -20,6 +20,14 @@ html = f"""<!doctype html>
 <meta name="description" content="중앙대학교 서울캠퍼스를 3D로 부수고 지구 중심까지 파 내려가는 스트레스 해소 게임">
 <meta property="og:title" content="SMASH CAU">
 <meta property="og:description" content="중앙대를 부셔 (시험기간 스트레스 해소)">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://hong-iron.github.io/SMASH-CAU/">
+<meta property="og:image" content="https://hong-iron.github.io/SMASH-CAU/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="폭탄이 터지며 무너지는 중앙대 서울캠퍼스 3D 화면과 SMASH CAU 제목">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://hong-iron.github.io/SMASH-CAU/og.png">
 <link rel="icon" href="{icon}">
 {head.strip()}
 </head>
