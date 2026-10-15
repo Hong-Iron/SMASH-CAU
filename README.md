@@ -1,0 +1,38 @@
+# SMASH CAU
+
+중앙대학교 서울캠퍼스를 3D로 부수는 브라우저 게임입니다. 시험 기간 스트레스 해소용입니다.
+
+**바로 하기:** https://hong-iron.github.io/SMASH-CAU/
+
+## 하는 법
+
+- 건물을 누르면 고른 도구로 부숩니다. 떨어진 조각을 또 누르면 더 잘게 부서집니다.
+- 도구는 세 가지입니다. 숫자 키 1·2·3으로도 바꿀 수 있습니다.
+  - 폭탄: 넓게 날려 버리고, 땅에 떨어지면 구덩이를 팝니다.
+  - 주먹: 덩어리째 쳐냅니다.
+  - 곡괭이: 조금씩 파냅니다.
+- 부술 때마다 스타일 랭크가 D → C → B → A → S → SS → SSS로 오르고 점수가 쌓입니다.
+  - 도구를 바꿔 가며 빠르게 부수면 배율이 붙습니다. 같은 도구만 계속 쓰면 깎입니다.
+  - 공중에 뜬 조각을 치면 공중 콤보, 건물 하나를 다 무너뜨리면 붕괴 보너스를 받습니다.
+  - 잠시 손을 놓으면 랭크가 서서히 내려갑니다.
+- 땅을 계속 파면 흙 → 지각 → 맨틀 → 외핵 → 내핵을 지나 지구 중심까지 내려갑니다. 화면 아래 깊이 표시는 실제 깊이(km)로 바꿔 보여 줍니다.
+- 되돌리기(Ctrl+Z, Mac은 ⌘Z)는 한 단계씩, 전부 복구는 처음 상태로 돌아갑니다.
+- 화면 조작: 끌기는 돌리기, 오른쪽 끌기는 옮기기, 휠은 확대입니다.
+
+## 데이터와 출처
+
+- 건물 모양과 층수, 도로, 녹지: © OpenStreetMap 기여자 (ODbL). `data/campus.json`도 ODbL을 따릅니다.
+- 땅 높이: AWS Terrain Tiles (Mapzen terrarium 형식, SRTM 30 m 기반).
+- 100주년기념관 층수(지상 12층, 지하 6층): 대학저널 2016년 준공 보도.
+- OpenStreetMap에 층수가 없는 건물 6동은 4층으로 어림했습니다.
+- 건물 겉모습(창문, 벽돌, 유리)은 실제 사진이 아니라 코드로 그린 일반 재질입니다.
+
+## 만든 방법
+
+- 3D는 three.js r160(CDN), 소리는 Web Audio로 합성합니다. 소리 파일은 없습니다.
+- 페이지 만들기: `src/app.html` + `data/campus.json` → `python3 tools/assemble.py` → `site/index.html`
+- 데이터 다시 만들기 (numpy, matplotlib 필요):
+  1. `sh tools/fetch.sh raw`
+  2. `python3 tools/build_campus.py raw raw/campus_raw.json`
+  3. `python3 tools/add_trees.py raw/campus_raw.json data/campus.json`
+- `main`에 push하면 GitHub Actions가 `site/` 폴더를 GitHub Pages에 올립니다.
