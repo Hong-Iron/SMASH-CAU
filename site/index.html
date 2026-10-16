@@ -120,7 +120,8 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
 .opt { padding: 5px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); cursor: pointer; font-size: 12.5px; }
 .opt:hover { background: var(--hover); }
 .opt[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
-.opt.support { display: inline-flex; align-items: center; text-decoration: none; background: #ffdd00; border-color: #e3c300; color: #1f1700; font-weight: 600; }
+.support-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.opt.support { display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; text-decoration: none; background: #ffdd00; border-color: #e3c300; color: #1f1700; font-weight: 600; }
 .opt.support:hover { background: #ffe640; }
 .opt.support.kakao { background: #fee500; border-color: #e0c800; color: #191919; }
 .opt.support.kakao:hover { background: #fff04d; }
@@ -211,6 +212,8 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
   .tool svg { width: 20px; height: 20px; }
   .acts { grid-template-columns: 1.3fr 1fr auto; gap: 5px; }
   .toolopt { padding: 5px 9px 6px; }
+  .support-row { gap: 5px; }
+  .support-row .opt { padding: 4px 6px; font-size: 12px; }
   .toolopt input { margin-top: 2px; }
   .act { padding: 7px 8px; font-size: 13px; }
   #more { display: flex; min-width: 44px; font-weight: 700; letter-spacing: .08em; }
@@ -317,6 +320,8 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
         <button class="opt" id="t-sound" type="button" aria-pressed="true">소리</button>
         <button class="opt" id="t-home" type="button">처음 시점</button>
         <button class="opt" id="t-top" type="button">위에서 보기</button>
+      </div>
+      <div class="support-row" id="support-row" hidden>
         <a class="opt support kakao" id="t-support-kakao" href="#" target="_blank" rel="noopener" hidden>카카오페이로 응원</a>
         <a class="opt support" id="t-support" href="#" target="_blank" rel="noopener" hidden>☕ Buy Me a Coffee</a>
       </div>
@@ -2867,6 +2872,7 @@ $('quake-mag').addEventListener('input', (e) => { setQuakeMag(parseFloat(e.targe
 setBatSize(parseFloat(recall('smash-bat')) || 1);
 setQuakeMag(parseFloat(recall('smash-quake')) || 9);
 document.querySelectorAll('.tool').forEach((el) => el.addEventListener('click', () => setTool(el.dataset.tool)));
+if (CFG.support || CFG.supportKakao) $('support-row').hidden = false;
 if (CFG.support) { const sp = $('t-support'); sp.href = CFG.support; sp.hidden = false; }
 if (CFG.supportKakao) { const sp = $('t-support-kakao'); sp.href = CFG.supportKakao; sp.hidden = false; }
 $('undo').addEventListener('click', undo);
