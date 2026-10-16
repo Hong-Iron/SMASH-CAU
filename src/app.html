@@ -84,6 +84,10 @@ h1 { margin: 0; font: 400 22px/1.2 "Bungee", Impact, "Arial Black", sans-serif; 
 kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
 
 .acts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.toolopt { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 10px; padding: 7px 10px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.toolopt label { font-weight: 600; font-size: 12.5px; }
+.toolopt output { justify-self: end; font: 500 12px var(--font-data); color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.toolopt input { grid-column: 1 / -1; width: 100%; margin: 4px 0 0; accent-color: var(--accent); }
 #more { display: none; }
 .credit .short { display: none; }
 #hint { display: none; }
@@ -189,6 +193,8 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
   .tool .td, .tool kbd, .act kbd { display: none; }
   .tool svg { width: 20px; height: 20px; }
   .acts { grid-template-columns: 1.3fr 1fr auto; gap: 5px; }
+  .toolopt { padding: 5px 9px 6px; }
+  .toolopt input { margin-top: 2px; }
   .act { padding: 7px 8px; font-size: 13px; }
   #more { display: flex; min-width: 44px; font-weight: 700; letter-spacing: .08em; }
   #more[aria-expanded="true"] { background: var(--accent-soft); border-color: var(--accent); }
@@ -272,6 +278,16 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
           </svg>
           <span class="tn">핵폭탄</span><span class="td">통째로</span><kbd>6</kbd>
         </button>
+      </div>
+      <div class="toolopt" id="opt-bat" hidden>
+        <label for="bat-size">배트 크기</label>
+        <output id="bat-size-out" for="bat-size"></output>
+        <input type="range" id="bat-size" min="0.5" max="3" step="0.25" value="1">
+      </div>
+      <div class="toolopt" id="opt-quake" hidden>
+        <label for="quake-mag">지진 세기</label>
+        <output id="quake-mag-out" for="quake-mag"></output>
+        <input type="range" id="quake-mag" min="4" max="10" step="0.5" value="9">
       </div>
       <div class="acts">
         <button class="act" id="undo" type="button" disabled>되돌리기 <kbd id="undo-key">Ctrl Z</kbd></button>
@@ -1423,14 +1439,15 @@ const SFX = {
     src.connect(fl).connect(g); send(c, g, 0.35); src.start(t, Math.random()); src.stop(t + 3.3);
     tone(c, t, 3.1, 'triangle', 42, 90, 0.2, 0.2, 2.5);
   },
-  quake(dur) {
+  quake(dur, k = 1) {
+    const v = 0.3 + 0.7 * Math.min(1, k);
     const c = audio(); if (!c) return; const t = c.currentTime;
     const src = c.createBufferSource(); src.buffer = noiseBuf;
     const fl = c.createBiquadFilter(); fl.type = 'lowpass'; fl.frequency.value = 220;
-    const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(1.1, t + 0.3); g.gain.setValueAtTime(1.0, t + dur * 0.65); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.8);
+    const g = c.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(1.1 * v, t + 0.3); g.gain.setValueAtTime(1.0 * v, t + dur * 0.65); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.8);
     src.connect(fl).connect(g); send(c, g, 0.45); src.start(t, Math.random()); src.stop(t + dur + 1);
-    tone(c, t, dur + 0.3, 'sine', 34, 28, 0.85, 0.1, 0.2);
-    crackle(c, t + 0.1, dur, 110, 1400, 0.28);
+    tone(c, t, dur + 0.3, 'sine', 34, 28, 0.85 * v, 0.1, 0.2);
+    crackle(c, t + 0.1, dur, Math.round(110 * v), 1400, 0.28 * v);
   },
   dig(layer) {
     const c = audio(); if (!c) return; const t = c.currentTime;
@@ -1588,7 +1605,8 @@ function makeBat() {
   yaw.userData.pitch = pitch;
   return yaw;
 }
-const BAT_SCALE = 7.5, BAT_LEN = 4.9 * BAT_SCALE;   // a giant's bat, about 37 m
+const BAT_BASE = 7.5;   // scale 1 is a giant's bat, about 37 m long
+let batSize = 1;
 function makeTrail() {
   const N = 40, geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 6), 3));
@@ -1614,13 +1632,14 @@ const swings = [];
 let hitStop = 0;
 // wind-up, fast swing, contact (with a short hit-stop), follow-through, fade
 function swingBat(hit) {
+  const BAT_SCALE = BAT_BASE * batSize, BAT_LEN = 4.9 * BAT_SCALE;
   const fwd = hit.dir.clone(); fwd.y = 0;
   if (fwd.lengthSq() < 1e-6) fwd.set(1, 0, 0);
   fwd.normalize();
   const mirror = Math.random() < 0.5 ? 1 : -1;                     // left- or right-handed swing
   const side = new THREE.Vector3(-fwd.z, 0, fwd.x).multiplyScalar(mirror);
-  const reach = rand(24, 29);
-  const pivot = hit.point.clone().addScaledVector(side, -reach).addScaledVector(fwd, -3.5);   // just in front of the wall
+  const reach = rand(24, 29) * batSize;
+  const pivot = hit.point.clone().addScaledVector(side, -reach).addScaledVector(fwd, -3.5 * batSize);   // just in front of the wall
   const th = Math.atan2(-side.z, side.x);
   const wind = rand(1.9, 2.5), follow = rand(0.7, 1.3), ph0 = rand(-0.28, 0.12), lift = rand(0.2, 0.65);
   const W = rand(0.26, 0.34), SW = rand(0.16, 0.23), F = 0.3, OUT = 0.22;
@@ -1662,7 +1681,7 @@ function batHit(hit, fwd, lift = 0.4) {
   if (p && !world.has(p)) p = null;
   // each swing sends the ball its own way: a little left or right, a line drive or a high fly
   const heading = fwd.clone().applyAxisAngle(UP, rand(-0.35, 0.35));
-  const elev = 0.3 + 0.55 * lift + rand(-0.08, 0.08), speed = rand(30, 46);
+  const elev = 0.3 + 0.55 * lift + rand(-0.08, 0.08), speed = rand(30, 46) * (0.75 + 0.25 * batSize);
   const launch = () => heading.clone().multiplyScalar(speed * Math.cos(elev) * rand(0.88, 1.08)).add(new THREE.Vector3(rand(-2, 2), speed * Math.sin(elev) * rand(0.85, 1.1), rand(-2, 2)));
   const spin = () => new THREE.Vector3(rand(-9, 9), rand(-9, 9), rand(-9, 9));
   const flew = [];
@@ -1670,7 +1689,7 @@ function batHit(hit, fwd, lift = 0.4) {
     const b = hit.b;
     if (b.statics.size) {
       chunkify(b);
-      let hits = [...b.statics].filter((q) => aabbDist(q, hit.point) < TOOLS.bat.r).sort((a, c) => aabbDist(a, hit.point) - aabbDist(c, hit.point)).slice(0, 5);
+      let hits = [...b.statics].filter((q) => aabbDist(q, hit.point) < TOOLS.bat.r).sort((a, c) => aabbDist(a, hit.point) - aabbDist(c, hit.point)).slice(0, Math.min(40, Math.max(1, Math.round(5 * batSize * batSize))));
       if (!hits.length) { const n = nearestStatic(b, hit.point); if (n) hits = [n]; }
       for (const q of hits) {
         const kids = q.def.size > 5 ? splitPiece(q) : null;
@@ -1689,7 +1708,7 @@ function batHit(hit, fwd, lift = 0.4) {
   }
   if (flew.length) {
     swings.push({ t: 0, pieces: flew.map((q) => [q, q.pos.x, q.pos.z]) });
-    SFX.bat(); addShake(0.38, hit.point);
+    SFX.bat(); addShake(0.38 * Math.sqrt(batSize), hit.point);
     puff(hit.point, 30, 1, 4);
   } else {
     for (let i = 0; i < 26; i++) emit(dust, hit.point.x + rand(-1.5, 1.5), hit.point.y + rand(0, 1), hit.point.z + rand(-1.5, 1.5), rand(-3, 3), rand(1, 5), rand(-3, 3), rand(0.8, 1.8), 0.42, 0.33, 0.24, 0.6);
@@ -1917,29 +1936,37 @@ function cancelLaser() {
 }
 
 // ---- earthquake: the ground cracks open and the lower floors give way first
-let quake = null;
+let quake = null, quakeMag = 9, lastQuakeVol = 0;
+// 0 at magnitude 4 (a light shake), 1 at 9, a little more above that
+const quakeStrength = (M) => Math.min(1.25, Math.max(0, (M - 4) / 5));
+// rough epicentral intensity from magnitude (Gutenberg-Richter: M = 1 + 2/3 I0), Modified Mercalli scale
+const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+const epicIntensity = (M) => ROMAN[Math.min(12, Math.max(1, Math.round(1.5 * (M - 1))))];
 function startQuake(c) {
   pushHistory();
   const R = TOOLS.quake.r;
-  const mag = (8.4 + Math.random() * 1.2).toFixed(1);
-  quake = { c: c.clone(), t: 0, dur: 3, next: 0.06, R, waves: [0.15, 1.1], wave: 0, pancaked: new Set(), thump: 0,
-    act: { tool: 'quake', pt: c.clone(), vol: 0, splits: 0, air: 0, dug: 0, layer: -1, center: false, pre: [`규모 ${mag} 대지진`], bonus: 1500 } };
-  for (const b of B) if (b.whole && Math.hypot(b.cx - c.x, b.cz - c.z) < R * 0.45) { chunkify(b); rebuildStatic(b); }
+  const M = quakeMag, mag = M.toFixed(1), sv = quakeStrength(M);
+  const Rq = R * (sv <= 1 ? 0.3 + 0.7 * sv : 1 + 1.5 * (sv - 1));
+  const kind = M >= 8 ? '대지진' : M >= 6 ? '강진' : '지진';
+  const waves = sv < 0.3 ? [] : sv < 0.6 ? [0.2] : sv < 1.1 ? [0.15, 1.1] : [0.15, 0.8, 1.6];
+  quake = { c: c.clone(), t: 0, dur: 3, next: 0.06, R: Rq, s: sv, waves, wave: 0, pancaked: new Set(), thump: 0,
+    act: { tool: 'quake', pt: c.clone(), vol: 0, splits: 0, air: 0, dug: 0, layer: -1, center: false, pre: [`규모 ${mag} ${kind}`], bonus: Math.max(100, Math.round(1500 * sv * sv)) } };
+  if (sv >= 0.5) for (const b of B) if (b.whole && Math.hypot(b.cx - c.x, b.cz - c.z) < Rq * 0.45) { chunkify(b); rebuildStatic(b); }
   fogHot.set(0xb8a07c); fogHeat = Math.max(fogHeat, 0.9);
-  banner(`규모 ${mag} 대지진`, '캠퍼스 전체가 흔들립니다');
-  SFX.quake(3);
+  banner(`규모 ${mag} ${kind}`, M < 5.5 ? '땅이 조금 흔들립니다' : M < 7 ? '건물에 금이 갑니다' : M < 8.5 ? '건물이 무너지기 시작합니다' : '캠퍼스 전체가 흔들립니다');
+  SFX.quake(3, sv);
 }
 function openCracks(q, wave) {
-  const n = 7 + Math.floor(Math.random() * 4), digs = [];
+  const n = Math.max(2, Math.round((7 + Math.random() * 4) * Math.min(1.3, q.s))), digs = [];
   for (let i = 0; i < n; i++) {
     let x = q.c.x, z = q.c.z, ang = (i / n) * Math.PI * 2 + rand(-0.4, 0.4);
     if (wave > 0) { const a0 = rand(0, Math.PI * 2), r0 = rand(0.1, 0.6) * q.R; x += Math.cos(a0) * r0; z += Math.sin(a0) * r0; }
     const pts = [[x, z]], len = rand(0.4, 0.9) * q.R;
     for (let s2 = 0; s2 < len; s2 += 6) { ang += rand(-0.4, 0.4); x += Math.cos(ang) * 6; z += Math.sin(ang) * 6; pts.push([x, z]); digs.push([x, z]); }
-    const mark = { pts, w: 2 + Math.random() * 2.5, color: 'rgba(20,14,9,.94)' };
+    const mark = { pts, w: (2 + Math.random() * 2.5) * Math.min(1.4, 0.4 + 0.6 * q.s), color: 'rgba(20,14,9,.94)' };
     scorches.push(mark); drawScorch(mark);
   }
-  for (const [x, z] of digs) digAt(x, z, 3, 3 + Math.random() * 4, true);
+  for (const [x, z] of digs) digAt(x, z, 3, (3 + Math.random() * 4) * Math.min(1.5, q.s), true);
   flushDig();
   SFX.crumble(60);
 }
@@ -1947,11 +1974,11 @@ function updateQuake(dt) {
   const q = quake;
   q.t += dt;
   const env = q.t < 0.3 ? q.t / 0.3 : q.t < 1.9 ? 1 : Math.max(0, 1 - (q.t - 1.9) / (q.dur - 1.9));
-  QU.uQC.value.set(q.c.x, q.c.z); QU.uQT.value = q.t; QU.uQA.value = env;
+  QU.uQC.value.set(q.c.x, q.c.z); QU.uQT.value = q.t; QU.uQA.value = env * (0.15 + 0.85 * q.s);
   const camK = Math.min(1, Math.max(0.45, 480 / (camera.position.distanceTo(q.c) + 100)));
-  trauma = Math.max(trauma, 0.95 * env * camK);
+  trauma = Math.max(trauma, Math.min(1, 0.3 + 0.65 * q.s) * env * camK);
   if (q.waves.length && q.t >= q.waves[0]) { q.waves.shift(); const prev = curAct; curAct = q.act; openCracks(q, q.wave++); curAct = prev; }
-  if (q.t >= q.thump && env > 0.3) { q.thump = q.t + rand(0.3, 0.5); SFX.thump(); }
+  if (q.t >= q.thump && env > 0.3 && q.s > 0.3) { q.thump = q.t + rand(0.3, 0.5); SFX.thump(); }
   if (q.t >= q.next) {
     q.next += 0.1;
     const prev = curAct; curAct = q.act;
@@ -1961,11 +1988,11 @@ function updateQuake(dt) {
       const d = Math.hypot(b.cx - q.c.x, b.cz - q.c.z);
       if (d > q.R) continue;
       const I = env * Math.pow(1 - d / q.R, 0.7);
-      if (I < 0.08) continue;
+      if (I < 0.08 || q.s < 0.2) continue;
       if (b.whole) { if (cut >= 6) continue; chunkify(b); cut++; }
       let hit = 0;
       // soft-storey collapse: the ground floor gives way and the whole building comes down
-      if (!q.pancaked.has(b) && I > 0.3 && Math.random() < I * 0.45) {
+      if (!q.pancaked.has(b) && q.s >= 0.85 && I > 0.3 && Math.random() < I * 0.45 * Math.pow(q.s, 4)) {
         q.pancaked.add(b);
         for (const pc of [...b.statics]) if (pc.def.level <= 0 || pc.def.mech || (pc.def.level === 1 && Math.random() < 0.6)) {
           release(pc, new THREE.Vector3(rand(-2, 2), 0, rand(-2, 2)), new THREE.Vector3(rand(-1, 1), rand(-1, 1), rand(-1, 1))); hit++;
@@ -1975,11 +2002,11 @@ function updateQuake(dt) {
         for (let i = 0; i < 26; i++) { const s2 = rand(0.3, 0.45); emit(smoke, b.cx + rand(-spread, spread), gy + rand(2, 12), b.cz + rand(-spread, spread), rand(-4, 4), rand(3, 9), rand(-4, 4), rand(3, 6), s2 * 1.15, s2, s2 * 0.85, 0.6); }
       }
       const list = [...b.statics];
-      const count = Math.floor(I * (2 + list.length * 0.06) * Math.random());
+      const count = Math.floor(I * (2 + list.length * 0.06) * Math.random() * Math.pow(q.s, 3) + Math.random());
       for (let k = 0; k < count && list.length; k++) {
         const pc = list.splice(Math.floor(Math.random() * list.length), 1)[0];
         if (!pc.static) continue;
-        release(pc, new THREE.Vector3(rand(-5, 5) * I, rand(0, 3) * I, rand(-5, 5) * I), new THREE.Vector3(rand(-2, 2), rand(-2, 2), rand(-2, 2)));
+        release(pc, new THREE.Vector3(rand(-5, 5) * I * q.s, rand(0, 3) * I * q.s, rand(-5, 5) * I * q.s), new THREE.Vector3(rand(-2, 2), rand(-2, 2), rand(-2, 2)));
         hit++;
       }
       if (hit) { fell += hit + support(b); wakeNear(b.x0, b.x1, b.z0, b.z1); rebuildStatic(b); }
@@ -1989,14 +2016,14 @@ function updateQuake(dt) {
     for (let i = 0; i < TREES.length; i++) {
       if (treeHidden[i]) continue;
       const [x, z] = TREES[i], d = Math.hypot(x - q.c.x, z - q.c.z);
-      if (d < q.R && Math.random() < 0.035 * env * (1 - d / q.R)) { treeHidden[i] = 1; gone++; }
+      if (d < q.R && Math.random() < 0.035 * env * q.s * q.s * (1 - d / q.R)) { treeHidden[i] = 1; gone++; }
     }
     if (gone) placeTrees();
     curAct = prev;
     if (fell > 6) SFX.crumble(Math.min(80, fell));
     capPieces();
   }
-  if (q.t > q.dur) { QU.uQA.value = 0; quake = null; const prev = curAct; curAct = q.act; endAct(); curAct = prev; }
+  if (q.t > q.dur) { lastQuakeVol = Math.round(q.act.vol); QU.uQA.value = 0; quake = null; const prev = curAct; curAct = q.act; endAct(); curAct = prev; }
 }
 
 // ============ digging toward the centre of the Earth
@@ -2793,13 +2820,34 @@ function toast(text) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { el.classList.add('fade'); toastTimer = setTimeout(() => { el.hidden = true; }, 500); }, 2600);
 }
-const TOOL_TIPS = { laser: '끌어서 선을 그으면 그 선을 따라 자릅니다. 톡 누르면 한 점만 태웁니다.', meteor: '누른 곳에 운석이 떨어집니다.', quake: '누른 곳이 진원이 되어 몇 초 동안 흔들립니다.', bat: '맞은 덩어리가 70 m 넘게 날아가면 홈런입니다.' };
+const TOOL_TIPS = { laser: '끌어서 선을 그으면 그 선을 따라 자릅니다. 톡 누르면 한 점만 태웁니다.', meteor: '누른 곳에 운석이 떨어집니다.', quake: '누른 곳이 진원이 됩니다. 아래 막대로 세기를 고르세요.', bat: '아래 막대로 배트 크기를 고르세요. 70 m 넘게 날리면 홈런입니다.' };
 function setTool(t) {
   if (t !== tool && TOOL_TIPS[t]) toast(TOOL_TIPS[t]);
   tool = t;
   document.querySelectorAll('.tool').forEach((el) => el.setAttribute('aria-checked', String(el.dataset.tool === t)));
   reticle.scale.setScalar(TOOLS[t].r);
+  $('opt-bat').hidden = t !== 'bat';
+  $('opt-quake').hidden = t !== 'quake';
+  obstaclesAt = -99;
 }
+const store = (k, v) => { try { localStorage.setItem(k, String(v)); } catch (e) { /* storage blocked */ } };
+const recall = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+function setBatSize(k) {
+  batSize = Math.min(3, Math.max(0.5, k));
+  TOOLS.bat.r = 6 * batSize;
+  if (tool === 'bat') reticle.scale.setScalar(TOOLS.bat.r);
+  $('bat-size').value = String(batSize);
+  $('bat-size-out').textContent = `×${batSize.toFixed(2).replace(/\.?0+$/, '')} · 길이 ${Math.round(36.75 * batSize)} m`;
+}
+function setQuakeMag(M) {
+  quakeMag = Math.min(10, Math.max(4, M));
+  $('quake-mag').value = String(quakeMag);
+  $('quake-mag-out').textContent = `규모 ${quakeMag.toFixed(1)} · 진앙 진도 약 ${epicIntensity(quakeMag)}`;
+}
+$('bat-size').addEventListener('input', (e) => { setBatSize(parseFloat(e.target.value)); store('smash-bat', batSize); });
+$('quake-mag').addEventListener('input', (e) => { setQuakeMag(parseFloat(e.target.value)); store('smash-quake', quakeMag); });
+setBatSize(parseFloat(recall('smash-bat')) || 1);
+setQuakeMag(parseFloat(recall('smash-quake')) || 9);
 document.querySelectorAll('.tool').forEach((el) => el.addEventListener('click', () => setTool(el.dataset.tool)));
 if (CFG.support) { const sp = $('t-support'); sp.href = CFG.support; sp.hidden = false; }
 if (CFG.supportKakao) { const sp = $('t-support-kakao'); sp.href = CFG.supportKakao; sp.hidden = false; }
@@ -2933,6 +2981,9 @@ window.__cau = {
   tick(sec) { for (let i = 0; i < Math.round(sec * 60); i++) simulate(1 / 60, performance.now()); },
   laserPath(pts) { fireLaser(pts.map(([x, z]) => new THREE.Vector3(x, groundY(x, z), z))); },
   meteorAt(x, z) { launchMeteor(new THREE.Vector3(x, groundY(x, z), z)); },
+  setBat(k) { setBatSize(k); },
+  setQuake(m) { setQuakeMag(m); },
+  quakeVol: () => lastQuakeVol,
   quakeAt(x, z) { startQuake(new THREE.Vector3(x, groundY(x, z), z)); },
   nukeAt(x, z) { launchNuke(new THREE.Vector3(x, groundY(x, z) + 25, z)); },
   cine: () => (cine ? { phase: cine.phase, t: cine.t } : null),
