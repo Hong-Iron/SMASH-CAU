@@ -1340,24 +1340,25 @@ function updateFx(dt) {
 }
 
 // ============ sound (synthesised, no files)
-let actx = null, soundOn = true, noiseBuf = null, master = null, verb = null;
+let actx = null, soundOn = true, noiseBuf = null, master = null, verb = null, sfxOverride = null;
+function buildBus(c) {
+  const comp = c.createDynamicsCompressor();
+  comp.threshold.value = -16; comp.knee.value = 12; comp.ratio.value = 6; comp.attack.value = 0.003; comp.release.value = 0.3;
+  master = c.createGain(); master.gain.value = 0.85;
+  master.connect(comp).connect(c.destination);
+  const len = Math.floor(c.sampleRate * 2.4), ir = c.createBuffer(2, len, c.sampleRate);
+  for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2); }
+  verb = c.createConvolver(); verb.buffer = ir;
+  const wet = c.createGain(); wet.gain.value = 0.32;
+  verb.connect(wet).connect(master);
+  noiseBuf = c.createBuffer(1, c.sampleRate * 3, c.sampleRate);
+  const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+}
 function audio() {
+  if (sfxOverride) return sfxOverride;
   if (!soundOn) return null;
   try {
-    if (!actx) {
-      actx = new (window.AudioContext || window.webkitAudioContext)();
-      const comp = actx.createDynamicsCompressor();
-      comp.threshold.value = -16; comp.knee.value = 12; comp.ratio.value = 6; comp.attack.value = 0.003; comp.release.value = 0.3;
-      master = actx.createGain(); master.gain.value = 0.85;
-      master.connect(comp).connect(actx.destination);
-      const len = Math.floor(actx.sampleRate * 2.4), ir = actx.createBuffer(2, len, actx.sampleRate);
-      for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2); }
-      verb = actx.createConvolver(); verb.buffer = ir;
-      const wet = actx.createGain(); wet.gain.value = 0.32;
-      verb.connect(wet).connect(master);
-      noiseBuf = actx.createBuffer(1, actx.sampleRate * 3, actx.sampleRate);
-      const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    }
+    if (!actx) { actx = new (window.AudioContext || window.webkitAudioContext)(); buildBus(actx); }
     if (actx.state === 'suspended') actx.resume();
     return actx;
   } catch (e) { return null; }
@@ -1403,12 +1404,23 @@ const SFX = {
     tone(c, t, 0.6, 'triangle', 150, 42, 0.45 * k, 0.1);
     crackle(c, t + 0.12, 2.0, 46, 2600, 0.28 * k);
   },
-  bat() {
+  bat(k = 1) {
     const c = audio(); if (!c) return; const t = c.currentTime;
-    noise(c, t, 0.05, 'highpass', 2600, 1800, 0.6, 0.2);
-    tone(c, t, 0.12, 'triangle', vary(1150), 700, 0.35, 0.25);
-    tone(c, t, 0.2, 'sine', 420, 170, 0.45, 0.15);
-    crackle(c, t + 0.05, 0.5, 12, 2200, 0.15);
+    const f = vary(1400) / Math.pow(k, 0.35), ring = Math.sqrt(k);
+    // the crack of contact
+    noise(c, t, 0.022, 'highpass', 6000, 4200, 0.9, 0.15);
+    noise(c, t, 0.05, 'bandpass', 2800, 1900, 0.45, 0.2, 2.5);
+    // hollow-tube ring: inharmonic partials, the high ones die first; the two close ones shimmer
+    [[1, 0.42, 1.1], [1.012, 0.3, 1.0], [1.86, 0.2, 0.55], [2.95, 0.13, 0.32], [4.1, 0.07, 0.18]].forEach(([m, g, d]) => {
+      const o = c.createOscillator(); o.type = 'sine';
+      o.frequency.setValueAtTime(f * m * 1.03, t); o.frequency.exponentialRampToValueAtTime(f * m, t + 0.035);
+      const gg = c.createGain(), end = t + d * ring;
+      gg.gain.setValueAtTime(0.0001, t); gg.gain.linearRampToValueAtTime(g, t + 0.002); gg.gain.exponentialRampToValueAtTime(0.0001, end);
+      o.connect(gg); send(c, gg, 0.4); o.start(t); o.stop(end + 0.05);
+    });
+    // the weight of a giant swing landing
+    tone(c, t, 0.15, 'sine', 210, 70, 0.4 * Math.min(1.5, k), 0.1);
+    crackle(c, t + 0.06, 0.45, 10, 2200, 0.1);
   },
   whiff() { const c = audio(); if (!c) return; const t = c.currentTime; noise(c, t, 0.26, 'bandpass', 420, 2600, 0.22, 0.1, 1.2); },
   cheer() {
@@ -1713,7 +1725,7 @@ function batHit(hit, fwd, lift = 0.4) {
   }
   if (flew.length) {
     swings.push({ t: 0, pieces: flew.map((q) => [q, q.pos.x, q.pos.z]) });
-    SFX.bat(); addShake(0.38 * Math.sqrt(batSize), hit.point);
+    SFX.bat(batSize); addShake(0.38 * Math.sqrt(batSize), hit.point);
     puff(hit.point, 30, 1, 4);
   } else {
     for (let i = 0; i < 26; i++) emit(dust, hit.point.x + rand(-1.5, 1.5), hit.point.y + rand(0, 1), hit.point.z + rand(-1.5, 1.5), rand(-3, 3), rand(1, 5), rand(-3, 3), rand(0.8, 1.8), 0.42, 0.33, 0.24, 0.6);
@@ -2988,6 +3000,23 @@ window.__cau = {
   laserPath(pts) { fireLaser(pts.map(([x, z]) => new THREE.Vector3(x, groundY(x, z), z))); },
   meteorAt(x, z) { launchMeteor(new THREE.Vector3(x, groundY(x, z), z)); },
   setBat(k) { setBatSize(k); },
+  async renderSfx(name, arg, sec = 1.6) {
+    const sr = 44100, off = new OfflineAudioContext(2, Math.round(sr * sec), sr);
+    const keep = [master, verb, noiseBuf];
+    buildBus(off); sfxOverride = off;
+    try { SFX[name](arg); } finally { sfxOverride = null; }
+    const buf = await off.startRendering();
+    [master, verb, noiseBuf] = keep;
+    const n = buf.length, out = new DataView(new ArrayBuffer(44 + n * 4));
+    const str = (o, x) => { for (let i = 0; i < x.length; i++) out.setUint8(o + i, x.charCodeAt(i)); };
+    str(0, 'RIFF'); out.setUint32(4, 36 + n * 4, true); str(8, 'WAVEfmt '); out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 2, true);
+    out.setUint32(24, sr, true); out.setUint32(28, sr * 4, true); out.setUint16(32, 4, true); out.setUint16(34, 16, true); str(36, 'data'); out.setUint32(40, n * 4, true);
+    const L = buf.getChannelData(0), R = buf.getChannelData(1);
+    for (let i = 0; i < n; i++) { out.setInt16(44 + i * 4, Math.max(-1, Math.min(1, L[i])) * 32767, true); out.setInt16(46 + i * 4, Math.max(-1, Math.min(1, R[i])) * 32767, true); }
+    let bin = ''; const u8 = new Uint8Array(out.buffer);
+    for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+    return btoa(bin);
+  },
   setQuake(m) { setQuakeMag(m); },
   quakeVol: () => lastQuakeVol,
   quakeAt(x, z) { startQuake(new THREE.Vector3(x, groundY(x, z), z)); },
