@@ -13,6 +13,8 @@ page = tpl.replace("__CAU_DATA__", blob).replace("__TITLE__", html.escape(cfg["t
 head, rest = page.split('<div id="app">', 1)
 e = lambda v: html.escape(v, quote=True)
 url = cfg["url"]
+# visit counter (GoatCounter, no cookies); it skips localhost and file:// pages on its own
+gc = f'<script data-goatcounter="{e(cfg["goatcounter"])}" async src="https://gc.zgo.at/count.js"></script>\n' if cfg.get("goatcounter") else ""
 doc = f"""<!doctype html>
 <html lang="ko">
 <head>
@@ -32,7 +34,7 @@ doc = f"""<!doctype html>
 <link rel="icon" href="icon-32.png" sizes="32x32">
 <link rel="icon" href="icon-512.png" sizes="512x512">
 <link rel="apple-touch-icon" href="icon-180.png">
-{head.strip()}
+{gc}{head.strip()}
 </head>
 <body>
 <div id="app">{rest.rstrip()}

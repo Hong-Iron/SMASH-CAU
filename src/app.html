@@ -166,6 +166,12 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
 .rko { font: 600 12px/1.3 var(--font-ui); color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, .75); }
 .score { margin: 4px 0 0; display: flex; align-items: baseline; gap: 8px; padding: 3px 10px 4px; border-radius: 7px; background: rgba(12, 14, 18, .58); font: 400 12px "Bungee", Impact, sans-serif; color: rgba(255, 255, 255, .9); text-shadow: 0 2px 4px rgba(0, 0, 0, .6); }
 .score b { font: 400 24px "Bungee", Impact, sans-serif; color: #fff; -webkit-text-stroke: .8px rgba(12, 14, 18, .9); font-variant-numeric: tabular-nums; }
+.lb { pointer-events: auto; display: grid; justify-items: end; margin-top: 2px; padding: 3px 9px 4px; border-radius: 7px; background: rgba(12, 14, 18, .58); color: #fff; text-decoration: none; font: 600 12px/1.35 var(--font-ui); text-shadow: 0 1px 3px rgba(0, 0, 0, .6); }
+.lb:hover { background: rgba(12, 14, 18, .78); }
+.lb b { color: #ffd23f; font-weight: 700; font-variant-numeric: tabular-nums; }
+.lb .sub { font-size: 11px; font-weight: 500; color: rgba(255, 255, 255, .78); }
+.lb.bump b { animation: lb-bump .5s; }
+@keyframes lb-bump { 40% { color: #fff; text-shadow: 0 0 10px #ffd23f; } }
 #pops { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .pop { position: absolute; left: 0; top: 0; display: grid; justify-items: center; gap: 2px; animation: popUp 1.4s ease-out forwards; }
 .pop b { font: 400 28px/1 "Bungee", Impact, sans-serif; color: var(--rc, #fff); -webkit-text-stroke: 1.2px rgba(12, 14, 18, .9); text-shadow: 0 3px 0 rgba(12, 14, 18, .5); }
@@ -203,6 +209,8 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
   .rko { font-size: 10.5px; }
   .score { padding: 2px 8px 3px; }
   .score b { font-size: 16px; }
+  .lb { padding: 2px 7px 3px; font-size: 10.5px; }
+  .lb .sub { font-size: 10px; }
   .compass { display: none; }
   .depth { left: 10px; right: auto; top: calc(var(--title-h, 42px) + 16px + env(safe-area-inset-top, 0px)); bottom: auto; transform: none; width: auto; max-width: calc(100% - 170px); min-width: 0; padding: 5px 9px 6px; gap: 1px; }
   .depth .lbl { display: none; }
@@ -369,6 +377,7 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
   <div class="hud" id="hud">
     <div class="rank" id="rank"><span class="rk" id="rk">D</span><span class="rw" id="rw"></span><span class="gauge"><i id="gauge"></i></span><span class="rko" id="rko"></span></div>
     <p class="score"><span>SCORE</span><b id="score">0</b></p>
+    <a class="lb" id="lb" href="#" hidden><span id="lb-main"></span><span class="sub" id="lb-sub"></span></a>
   </div>
   <div id="pops"></div>
   <button class="depth" id="depth" type="button" hidden>
@@ -1825,6 +1834,7 @@ function updateSwings(dt) {
     style = Math.min(STYLE_CAP, style + 300); holdUntil = performance.now() + 1400;
     const gained = Math.round((400 + best * 6) * (r ? r.mult : 1));
     score += gained;
+    lbAdd(gained, 0);
     popup(at.clone(), gained, [`홈런! ${Math.round(best)} m`], r);
     refreshRank(true); SFX.cheer();
   }
@@ -2572,6 +2582,7 @@ function endAct() {
   const r = RANKS[rankOf(style)];
   const gained = Math.round(pts * (r ? r.mult : 1));
   score += gained;
+  lbAdd(gained, kills);
   popup(a.pt, gained, tags, r);
   refreshRank(true);
 }
@@ -3224,6 +3235,81 @@ $('share').addEventListener('click', openShare);
 $('share-close').addEventListener('click', closeShare);
 $('share-modal').addEventListener('click', (e) => { if (e.target.id === 'share-modal') closeShare(); });
 if (CFG.hub) { const h = $('hub-link'); h.href = CFG.hub; h.hidden = false; }
+
+// ---- visit counter events (GoatCounter, no cookies): only share, support and hub clicks, never per weapon
+function gcEvent(path) {
+  try { const g = window.goatcounter; if (g && g.count) g.count({ path, title: CFG.code || '', event: true }); } catch (e) { /* blocked by the browser */ }
+}
+[['share', 'share-open'], ['share-kakao', 'share-kakao'], ['share-insta', 'share-insta'], ['share-save', 'share-save'], ['share-copy', 'share-copy'],
+  ['t-support-kakao', 'support-kakaopay'], ['t-support', 'support-bmc'], ['hub-link', 'hub-link'], ['lb', 'rank-link']]
+  .forEach(([id, path]) => { const el = $(id); if (el) el.addEventListener('click', () => gcEvent(path)); });
+
+// ---- school leaderboard: points also go to the school's daily total (Supabase), the HUD shows today's national rank
+const LB = CFG.supabaseUrl && CFG.supabaseKey && CFG.code ? { url: CFG.supabaseUrl.replace(/\/+$/, ''), key: CFG.supabaseKey } : null;
+const lbPend = { score: 0, kills: 0 };
+let lbFirst = true, lbBusy = false, lbFails = 0, lbBoard = null, lbMine = 0, lbRank = 0;
+const trim0 = (v, d) => v.toFixed(d).replace(/\.0$/, '');
+const fmtPts = (n) => (n >= 1e8 ? `${trim0(n / 1e8, n >= 1e9 ? 0 : 1)}억` : n >= 1e4 ? `${trim0(n / 1e4, n >= 1e5 ? 0 : 1)}만` : Math.round(n).toLocaleString('ko-KR'));
+const shortName = (n) => (n || '').replace('대학교', '대').replace(/ 캠퍼스$/, '');
+function lbHeaders(json) {
+  const h = { apikey: LB.key };
+  if (/^eyJ/.test(LB.key)) h.Authorization = `Bearer ${LB.key}`; // legacy anon keys are JWTs; new publishable keys go in apikey only
+  if (json) h['Content-Type'] = 'application/json';
+  return h;
+}
+function lbAdd(pts, kills) {
+  if (!LB || !(pts > 0)) return;
+  lbPend.score += pts; lbPend.kills += kills || 0;
+  showRank();
+}
+function lbFlush(leaving) {
+  if (!LB || lbBusy || lbFails >= 4 || (lbPend.score < 1 && lbPend.kills < 1)) return;
+  const sent = { score: Math.round(lbPend.score), kills: lbPend.kills }, first = lbFirst;
+  lbPend.score = 0; lbPend.kills = 0; lbFirst = false; lbBusy = true;
+  fetch(`${LB.url}/rest/v1/rpc/smash_add`, {
+    method: 'POST', headers: lbHeaders(true), keepalive: !!leaving,
+    body: JSON.stringify({ p_code: CFG.code, p_score: sent.score, p_kills: sent.kills, p_new: first }),
+  }).then((r) => { if (!r.ok) throw new Error(r.status); lbFails = 0; lbMine += sent.score; })
+    .catch(() => { lbFails++; lbPend.score += sent.score; lbPend.kills += sent.kills; lbFirst = first; })
+    .finally(() => { lbBusy = false; });
+}
+async function lbFetch() {
+  if (!LB || document.visibilityState === 'hidden') return;
+  try {
+    const r = await fetch(`${LB.url}/rest/v1/rpc/smash_board`, { headers: lbHeaders(false) });
+    if (!r.ok) throw new Error(r.status);
+    const rows = await r.json();
+    if (Array.isArray(rows)) { lbBoard = rows; lbMine = 0; showRank(); }
+  } catch (e) { /* offline or blocked: keep the last board */ }
+}
+function showRank() {
+  const mine = lbBoard && lbBoard.find((r) => r.code === CFG.code);
+  if (!mine) return;
+  const myToday = Number(mine.today_score) + lbMine + lbPend.score;
+  const rows = lbBoard.map((r) => ({ code: r.code, name: r.name, v: r.code === CFG.code ? myToday : Number(r.today_score) })).sort((a, b) => b.v - a.v);
+  const i = rows.findIndex((r) => r.code === CFG.code), narrow = matchMedia('(max-width: 720px)').matches;
+  const main = $('lb-main'), sub = $('lb-sub');
+  if (myToday < 1) {
+    main.textContent = `${CFG.school || CFG.code} 오늘 아직 0점`;
+    sub.textContent = narrow ? '부순 만큼 학교 점수로' : '부순 점수가 학교 점수에 더해집니다';
+  } else {
+    const b = document.createElement('b'); b.textContent = `${i + 1}위`;
+    main.replaceChildren(`${CFG.school || CFG.code} 오늘 `, b, ` / ${rows.length}`);
+    if (i > 0) { const up = rows[i - 1], gap = up.v - myToday + 1; sub.textContent = narrow ? `${i}위까지 ${fmtPts(gap)}점` : `${i}위 ${shortName(up.name)}까지 ${fmtPts(gap)}점`; }
+    else sub.textContent = rows[1] && rows[1].v > 0 ? `2위와 ${fmtPts(myToday - rows[1].v)}점 차` : '오늘 전국 1위!';
+    if (lbRank && i + 1 < lbRank) { const el = $('lb'); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+    lbRank = i + 1;
+  }
+  $('lb').hidden = false;
+}
+if (LB) {
+  $('lb').href = `${CFG.hub || ''}#rank`;
+  setTimeout(lbFetch, 1200);
+  setInterval(() => lbFlush(false), 30000);
+  setInterval(lbFetch, 60000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') lbFlush(true); else lbFetch(); });
+  addEventListener('pagehide', () => lbFlush(true));
+}
 const syncTitleH = () => root.style.setProperty('--title-h', `${Math.round(document.querySelector('.titlebar').getBoundingClientRect().height)}px`);
 syncTitleH(); addEventListener('resize', syncTitleH); if (document.fonts) document.fonts.ready.then(syncTitleH);
 $('t-night').addEventListener('click', () => { setNight(!night); store('smash-night', night ? 1 : 0); });
@@ -3403,6 +3489,9 @@ window.__cau = {
   setNight: (v) => setNight(!!v),
   share: () => openShare(),
   runStats: () => runStats(),
+  lb: () => ({ on: !!LB, pend: { ...lbPend }, first: lbFirst, fails: lbFails, board: lbBoard ? lbBoard.length : 0, mine: lbMine, text: $('lb').hidden ? '' : $('lb').textContent }),
+  lbFlush: () => lbFlush(false),
+  lbFetch: () => lbFetch(),
   stats: () => ({ dyn: dyn.size, world: world.size, history: history.length, bombs: bombs.length, frames, fx: fx.length, pixelRatio, trees: TREES.length, coarse: COARSE, phone: PHONE }),
 };
 window.__cauReady = true;

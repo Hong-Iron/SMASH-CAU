@@ -31,6 +31,12 @@
 - 다른 학교는 왼쪽 위 제목 옆 **다른 학교** 버튼이나 [SMASH 대학교](https://hong-iron.github.io/SMASH/)에서 고를 수 있습니다.
 - 화면 조작: 끌기는 돌리기, 오른쪽 끌기는 옮기기, 휠은 확대입니다.
 
+## 학교 랭킹과 방문 통계
+
+- 게임에서 얻은 점수는 30초마다 학교 점수로 모이고, 화면 오른쪽 위 점수 아래에 우리 학교의 오늘 전국 순위와 바로 윗 순위까지 남은 점수가 나옵니다. 전체 순위는 [SMASH 대학교](https://hong-iron.github.io/SMASH/#rank)에서 볼 수 있습니다. 오늘 순위는 매일 자정(한국 시간)에 새로 시작합니다.
+- 랭킹 서버(Supabase)에는 학교 코드, 점수, 무너뜨린 건물 수만 보냅니다. 이름이나 기기 정보는 보내지 않습니다. 너무 자주 보내는 것을 막으려고 IP 주소를 날짜와 섞은 해시로 바꿔 2분 동안만 둡니다.
+- 방문 수는 쿠키를 쓰지 않는 [GoatCounter](https://www.goatcounter.com/)로 셉니다. 공유·응원·다른 학교 버튼을 누른 횟수도 함께 셉니다.
+
 ## 개발자 응원하기
 
 재미있게 하셨다면 커피 한 잔으로 응원해 주세요.
@@ -51,6 +57,7 @@
 - 같은 방식으로 만든 다른 학교: [SMASH SSU](https://github.com/Hong-Iron/SMASH-SSU), [SMASH SNU](https://github.com/Hong-Iron/SMASH-SNU)
 - 3D는 three.js r160(CDN), 소리는 Web Audio로 합성합니다. 소리 파일은 없습니다.
 - 학교 이름, 주소, 미리보기 문구, 건물별 재질 지정은 `config.json`에 있습니다.
+- 랭킹 서버 주소와 공개 키(`supabaseUrl`, `supabaseKey`), 방문 통계 주소(`goatcounter`)도 `config.json`에 있습니다. 랭킹 서버의 표와 함수는 [SMASH 저장소의 `supabase/`](https://github.com/Hong-Iron/SMASH/tree/main/supabase)에 있습니다.
 - 페이지 만들기: `src/app.html` + `data/campus.json` + `config.json` → `python3 tools/assemble.py` → `site/index.html`
 - 데이터 다시 만들기 (numpy, matplotlib 필요):
   1. `python3 tools/fetch.py way 284355223 raw`
