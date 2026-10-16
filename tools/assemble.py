@@ -12,10 +12,6 @@ assert "__CAU_DATA__" in tpl and "__TITLE__" in tpl
 page = tpl.replace("__CAU_DATA__", blob).replace("__TITLE__", html.escape(cfg["title"]))
 head, rest = page.split('<div id="app">', 1)
 e = lambda v: html.escape(v, quote=True)
-icon = ("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E"
-        "%3Ccircle cx='14' cy='19' r='10' fill='%231d1f22'/%3E"
-        "%3Cpath d='M21 11l4-4' stroke='%23c2410c' stroke-width='3' stroke-linecap='round'/%3E"
-        "%3Ccircle cx='27' cy='5' r='3' fill='%23ffb020'/%3E%3C/svg%3E")
 url = cfg["url"]
 doc = f"""<!doctype html>
 <html lang="ko">
@@ -33,7 +29,9 @@ doc = f"""<!doctype html>
 <meta property="og:image:alt" content="{e(cfg['ogAlt'])}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="{e(url)}og.png">
-<link rel="icon" href="{icon}">
+<link rel="icon" href="icon-32.png" sizes="32x32">
+<link rel="icon" href="icon-512.png" sizes="512x512">
+<link rel="apple-touch-icon" href="icon-180.png">
 {head.strip()}
 </head>
 <body>
