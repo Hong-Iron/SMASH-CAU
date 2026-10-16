@@ -104,9 +104,12 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
 #share-modal img { display: block; width: 100%; height: auto; border-radius: 8px; background: #0b0d12; }
 #share-modal .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 #share-modal .row .act { text-decoration: none; color: inherit; }
-#share-go { background: var(--accent) !important; border-color: var(--accent) !important; color: var(--on-accent) !important; }
+#share-modal .row svg { width: 18px; height: 18px; flex: none; }
+#share-modal .row .act { align-items: center; gap: 6px; }
+#share-kakao { background: #fee500 !important; border-color: #e0c800 !important; color: #191919 !important; font-weight: 600; }
+#share-insta { background: linear-gradient(45deg, #f9ce34, #ee2a7b 45%, #6228d7) !important; border-color: transparent !important; color: #fff !important; font-weight: 600; }
 #share-modal .note { margin: 0; font-size: 12px; color: var(--muted); }
-#toast { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); z-index: 46; max-width: calc(100% - 40px); margin: 0; padding: 8px 14px; border-radius: 10px; background: rgba(12, 14, 18, .82); color: #fff; font: 600 13px/1.5 var(--font-ui); text-align: center; pointer-events: none; transition: opacity .5s; }
+#toast { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); z-index: 80; max-width: calc(100% - 40px); margin: 0; padding: 8px 14px; border-radius: 10px; background: rgba(12, 14, 18, .82); color: #fff; font: 600 13px/1.5 var(--font-ui); text-align: center; pointer-events: none; transition: opacity .5s; }
 #toast.fade { opacity: 0; }
 .act { display: flex; justify-content: center; align-items: baseline; gap: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); cursor: pointer; font-weight: 500; }
 .act:hover:not(:disabled) { background: var(--hover); }
@@ -347,12 +350,14 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
       <h2 id="share-title">이번 판 결과 카드</h2>
       <img id="share-img" alt="부순 캠퍼스 화면과 점수, 랭크, 파괴율이 담긴 결과 카드">
       <div class="row">
-        <button class="act" id="share-go" type="button" hidden>공유하기</button>
+        <button class="act" id="share-kakao" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3.5c-5 0-9 3.1-9 7 0 2.5 1.7 4.7 4.2 5.9l-.9 3.4c-.1.3.3.6.6.4l4-2.6c.4 0 .7.1 1.1.1 5 0 9-3.1 9-7s-4-7.2-9-7.2z"/></svg>카카오톡</button>
+        <button class="act" id="share-insta" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17.4" cy="6.6" r="1.3" fill="currentColor"/></svg>인스타그램</button>
         <a class="act" id="share-save" href="#" download="smash.png">이미지 저장</a>
-        <button class="act" id="share-copy" type="button">문구·링크 복사</button>
+        <button class="act" id="share-copy" type="button">링크 복사</button>
+        <button class="act" id="share-go" type="button" hidden>다른 앱으로</button>
         <button class="act" id="share-close" type="button">닫기</button>
       </div>
-      <p class="note">이미지를 저장해서 카톡이나 인스타에 올려 보세요.</p>
+      <p class="note" id="share-note"></p>
     </div>
   </div>
   <p id="hint" hidden>한 손가락으로 끌면 이동 · 두 손가락으로 돌리기와 확대<br>톡 누르면 부서집니다</p>
@@ -3125,6 +3130,27 @@ async function makeCard(st) {
   return new Promise((res) => cv.toBlob(res, 'image/png'));
 }
 let shareBusy = false, shareURL = null;
+const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || COARSE;
+// KakaoTalk message (needs a Kakao developer JavaScript key in config.json "kakaoKey", with this site's domain registered)
+let kakaoReady = null;
+function loadKakao() {
+  if (!CFG.kakaoKey) return Promise.resolve(false);
+  if (kakaoReady) return kakaoReady;
+  kakaoReady = new Promise((res) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js'; sc.crossOrigin = 'anonymous';
+    sc.onload = () => { try { if (!window.Kakao.isInitialized()) window.Kakao.init(CFG.kakaoKey); res(true); } catch (e) { res(false); } };
+    sc.onerror = () => res(false);
+    document.head.append(sc);
+  });
+  return kakaoReady;
+}
+function downloadBlob(url, name) {
+  const a = document.createElement('a'); a.href = url; a.download = name; document.body.append(a); a.click(); a.remove();
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (e) { return false; }
+}
 async function openShare() {
   if (shareBusy || rewind) return;
   shareBusy = true;
@@ -3132,7 +3158,9 @@ async function openShare() {
     const st = runStats();
     const blob = await makeCard(st);
     const rk = bestRankIdx >= 0 ? RANKS[bestRankIdx].k : '';
-    const text = `${CFG.title} | ${CFG.school || ''} ${st.pct}% 파괴${rk ? `, 최고 ${rk} 랭크` : ''}! ${CFG.url || ''}`.trim();
+    const school = CFG.school || '';
+    const headline = `${school} ${st.pct}% 파괴${rk ? `, 최고 ${rk} 랭크` : ''}!`;
+    const text = `${CFG.title} | ${headline} ${CFG.url || ''}`.trim();
     const file = new File([blob], `smash-${(CFG.code || 'campus').toLowerCase()}.png`, { type: 'image/png' });
     if (shareURL) URL.revokeObjectURL(shareURL);
     shareURL = URL.createObjectURL(blob);
@@ -3140,10 +3168,44 @@ async function openShare() {
     $('share-save').href = shareURL; $('share-save').download = file.name;
     const canFile = !!(navigator.canShare && navigator.canShare({ files: [file] }));
     $('share-go').hidden = !canFile;
-    $('share-go').onclick = async () => { try { await navigator.share({ files: [file], title: CFG.title, text }); } catch (e) { /* closed the sheet */ } };
+    const sheet = canFile && IS_MOBILE;
+    $('share-note').textContent = CFG.kakaoKey ? '카카오톡은 카드와 게임 링크를 메시지로 보냅니다.'
+      : sheet ? '카카오톡·인스타그램 버튼을 누르면 공유 목록이 열립니다. 목록에서 앱을 고르세요.'
+      : '컴퓨터에서는 카드 이미지를 저장하고 링크를 복사해 카카오톡 PC나 인스타그램에 올려 주세요.';
+    // start the Kakao image upload early so the send happens right on the tap
+    let kakaoImage = null;
+    if (CFG.kakaoKey) {
+      kakaoImage = loadKakao().then((ok) => (ok ? window.Kakao.Share.uploadImage({ file: [file] }).then((r) => r.infos.original.url) : null)).catch(() => null);
+    }
+    const shareFile = async (withText) => {
+      try { await navigator.share(withText ? { files: [file], title: CFG.title, text } : { files: [file] }); } catch (e) { /* closed the sheet */ }
+    };
+    $('share-kakao').onclick = async () => {
+      if (CFG.kakaoKey && await loadKakao()) {
+        const img = (await kakaoImage) || `${CFG.url}og.png`;
+        try {
+          window.Kakao.Share.sendDefault({
+            objectType: 'feed',
+            content: { title: `${CFG.title} — ${headline}`, description: `점수 ${Math.round(score).toLocaleString('ko-KR')} · 무너진 건물 ${st.down}/${st.total}동`, imageUrl: img, imageWidth: 1080, imageHeight: 1350,
+              link: { mobileWebUrl: CFG.url, webUrl: CFG.url } },
+            buttons: [{ title: '나도 부수러 가기', link: { mobileWebUrl: CFG.url, webUrl: CFG.url } }],
+          });
+          return;
+        } catch (e) { /* fall through to the share sheet */ }
+      }
+      if (sheet) { toast('공유 목록에서 카카오톡을 고르세요.'); await shareFile(true); return; }
+      const copied = await copyText(text);
+      downloadBlob(shareURL, file.name);
+      toast(copied ? '링크를 복사하고 카드 이미지를 저장했습니다. 카카오톡에 붙여넣고 이미지를 함께 보내세요.' : '카드 이미지를 저장했습니다. 카카오톡에 이미지와 주소를 함께 보내세요.');
+    };
+    $('share-insta').onclick = async () => {
+      if (sheet) { toast('공유 목록에서 Instagram을 고르세요. 스토리나 게시물로 올릴 수 있습니다.'); await shareFile(false); return; }
+      downloadBlob(shareURL, file.name);
+      toast(IS_MOBILE ? '카드 이미지를 저장했습니다. 인스타그램 앱에서 스토리나 게시물로 올려 주세요.' : '카드 이미지를 저장했습니다. 인스타그램(앱이나 instagram.com)에서 올려 주세요.');
+    };
+    $('share-go').onclick = () => shareFile(true);
     $('share-copy').onclick = async () => {
-      try { await navigator.clipboard.writeText(text); toast('문구와 링크를 복사했습니다.'); }
-      catch (e) { toast('복사하지 못했습니다. 주소창의 링크를 직접 복사해 주세요.'); }
+      toast((await copyText(text)) ? '문구와 링크를 복사했습니다.' : '복사하지 못했습니다. 주소창의 링크를 직접 복사해 주세요.');
     };
     $('share-modal').hidden = false;
   } finally { shareBusy = false; }
