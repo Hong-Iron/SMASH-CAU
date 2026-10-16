@@ -1425,20 +1425,30 @@ const SFX = {
   bat(k = 1) {
     const c = audio(); if (!c) return; const t = c.currentTime;
     const f = vary(1400) / Math.pow(k, 0.35), ring = Math.sqrt(k);
-    // the crack of contact
-    noise(c, t, 0.022, 'highpass', 6000, 4200, 0.9, 0.15);
-    noise(c, t, 0.05, 'bandpass', 2800, 1900, 0.45, 0.2, 2.5);
-    // hollow-tube ring: inharmonic partials, the high ones die first; the two close ones shimmer
-    [[1, 0.42, 1.1], [1.012, 0.3, 1.0], [1.86, 0.2, 0.55], [2.95, 0.13, 0.32], [4.1, 0.07, 0.18]].forEach(([m, g, d]) => {
+    // the crack of a home run: a hard, wide click
+    noise(c, t, 0.03, 'highpass', 7000, 3500, 1.2, 0.25);
+    noise(c, t, 0.07, 'bandpass', 3200, 1600, 0.8, 0.3, 1.6);
+    tone(c, t, 0.06, 'square', f * 1.5, f * 1.2, 0.12, 0.2, 0.001);
+    // hollow-tube ring, driven a little so it bites; the two close partials shimmer
+    const pre = c.createGain(), drive = c.createWaveShaper(), post = c.createGain();
+    const curve = new Float32Array(1024);
+    for (let i = 0; i < 1024; i++) { const x = i / 511.5 - 1; curve[i] = Math.tanh(2.5 * x) / Math.tanh(2.5); }
+    drive.curve = curve; post.gain.value = 0.85;
+    pre.connect(drive).connect(post); send(c, post, 0.55);
+    [[1, 0.6, 1.3], [1.012, 0.42, 1.2], [1.86, 0.3, 0.65], [2.95, 0.2, 0.4], [4.1, 0.12, 0.22], [5.3, 0.06, 0.12]].forEach(([m, g, d]) => {
       const o = c.createOscillator(); o.type = 'sine';
       o.frequency.setValueAtTime(f * m * 1.03, t); o.frequency.exponentialRampToValueAtTime(f * m, t + 0.035);
       const gg = c.createGain(), end = t + d * ring;
       gg.gain.setValueAtTime(0.0001, t); gg.gain.linearRampToValueAtTime(g, t + 0.002); gg.gain.exponentialRampToValueAtTime(0.0001, end);
-      o.connect(gg); send(c, gg, 0.4); o.start(t); o.stop(end + 0.05);
+      o.connect(gg).connect(pre); o.start(t); o.stop(end + 0.05);
     });
-    // the weight of a giant swing landing
-    tone(c, t, 0.15, 'sine', 210, 70, 0.4 * Math.min(1.5, k), 0.1);
-    crackle(c, t + 0.06, 0.45, 10, 2200, 0.1);
+    // a stadium slap-back echo
+    const dl = c.createDelay(1), fb = c.createGain(), eg = c.createGain();
+    dl.delayTime.value = 0.17; fb.gain.value = 0.28; eg.gain.value = 0.35;
+    post.connect(dl); dl.connect(fb).connect(dl); dl.connect(eg).connect(master);
+    // weight of the swing
+    tone(c, t, 0.25, 'sine', 160, 50, 0.75 * Math.min(1.5, k), 0.15);
+    crackle(c, t + 0.06, 0.45, 10, 2200, 0.12);
   },
   whiff() { const c = audio(); if (!c) return; const t = c.currentTime; noise(c, t, 0.26, 'bandpass', 420, 2600, 0.22, 0.1, 1.2); },
   cheer() {
