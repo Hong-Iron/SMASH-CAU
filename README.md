@@ -56,5 +56,6 @@
   1. `python3 tools/fetch.py way 284355223 raw`
   2. `python3 tools/build_campus.py raw raw/campus_raw.json`
   3. `python3 tools/add_trees.py raw/campus_raw.json data/campus.json`
+  4. `python3 tools/fix_terrain.py data/campus.json` — 땅 높이 정리: 높이 자료의 빈칸(음수 값)을 메우고, 높은 건물이 언덕처럼 찍힌 자국을 지우고, 호수와 연못을 평평한 수면으로 맞춥니다.
   - 100주년기념관 층수(지상 12층)는 OpenStreetMap에 없어서 지금 `data/campus.json`에만 들어 있습니다. 데이터를 다시 만들면 직접 넣어야 합니다.
 - `main`에 push하면 GitHub Actions가 `site/` 폴더를 GitHub Pages에 올립니다.
