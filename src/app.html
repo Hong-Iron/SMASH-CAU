@@ -62,7 +62,11 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outlin
 
 .side { position: absolute; top: 16px; left: 16px; width: 292px; display: flex; flex-direction: column; gap: 10px; }
 .titlebar, .dock { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 28px var(--shadow); }
-.titlebar { padding: 12px 16px 11px; }
+.titlebar { padding: 10px 12px 10px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.titlebar h1 { min-width: 0; }
+.hub-link { flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); color: var(--fg); font: 600 12.5px/1.2 var(--font-ui); text-decoration: none; white-space: nowrap; }
+.hub-link:hover { background: var(--hover); border-color: var(--accent); }
+.hub-link svg { width: 13px; height: 13px; }
 .eyebrow { margin: 0; font: 500 11px/1.4 var(--font-data); letter-spacing: .03em; color: var(--muted); }
 h1 { margin: 0; font: 400 22px/1.2 "Bungee", Impact, "Arial Black", sans-serif; letter-spacing: .01em; text-wrap: balance; }
 .sub { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; }
@@ -189,7 +193,8 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
 
 @media (max-width: 720px) {
   .side { display: contents; }
-  .titlebar { position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); left: 10px; right: auto; padding: 6px 12px 7px; border-radius: 8px; }
+  .titlebar { position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); left: 10px; right: auto; max-width: calc(100% - 168px); padding: 5px 6px 5px 11px; border-radius: 8px; flex-wrap: wrap; row-gap: 4px; column-gap: 8px; }
+  .hub-link { padding: 4px 8px; font-size: 11.5px; }
   h1 { font-size: 16px; }
   .hud { top: calc(10px + env(safe-area-inset-top, 0px)); right: 10px; width: 140px; gap: 1px; }
   .rk { font-size: 40px; -webkit-text-stroke-width: 1.5px; }
@@ -199,7 +204,7 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
   .score { padding: 2px 8px 3px; }
   .score b { font-size: 16px; }
   .compass { display: none; }
-  .depth { left: 10px; right: auto; top: calc(52px + env(safe-area-inset-top, 0px)); bottom: auto; transform: none; width: auto; max-width: calc(100% - 170px); min-width: 0; padding: 5px 9px 6px; gap: 1px; }
+  .depth { left: 10px; right: auto; top: calc(var(--title-h, 42px) + 16px + env(safe-area-inset-top, 0px)); bottom: auto; transform: none; width: auto; max-width: calc(100% - 170px); min-width: 0; padding: 5px 9px 6px; gap: 1px; }
   .depth .lbl { display: none; }
   .depth .val { font-size: 13px; }
   .depth .lay { font-size: 11.5px; }
@@ -247,7 +252,7 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
   <div id="tip" hidden></div>
 
   <div class="side">
-    <header class="titlebar"><h1>__TITLE__</h1></header>
+    <header class="titlebar"><h1>__TITLE__</h1><a class="hub-link" id="hub-link" href="#" hidden><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 6.5 8 2l6 4.5M3.5 6v7.5h9V6"/></svg>다른 학교</a></header>
 
     <div class="dock">
       <div class="tools" role="radiogroup" aria-label="부수는 도구">
@@ -323,7 +328,6 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
         <button class="opt" id="t-home" type="button">처음 시점</button>
         <button class="opt" id="t-top" type="button">위에서 보기</button>
         <button class="opt" id="t-night" type="button" aria-pressed="false">밤</button>
-        <a class="opt" id="t-hub" href="#" hidden>다른 학교</a>
       </div>
       <div class="support-row" id="support-row" hidden>
         <a class="opt support kakao" id="t-support-kakao" href="#" target="_blank" rel="noopener" hidden>카카오페이로 응원</a>
@@ -3219,7 +3223,9 @@ const closeShare = () => { $('share-modal').hidden = true; };
 $('share').addEventListener('click', openShare);
 $('share-close').addEventListener('click', closeShare);
 $('share-modal').addEventListener('click', (e) => { if (e.target.id === 'share-modal') closeShare(); });
-if (CFG.hub) { const h = $('t-hub'); h.href = CFG.hub; h.hidden = false; }
+if (CFG.hub) { const h = $('hub-link'); h.href = CFG.hub; h.hidden = false; }
+const syncTitleH = () => root.style.setProperty('--title-h', `${Math.round(document.querySelector('.titlebar').getBoundingClientRect().height)}px`);
+syncTitleH(); addEventListener('resize', syncTitleH); if (document.fonts) document.fonts.ready.then(syncTitleH);
 $('t-night').addEventListener('click', () => { setNight(!night); store('smash-night', night ? 1 : 0); });
 setNight(recall('smash-night') === '1');
 
