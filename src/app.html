@@ -3257,21 +3257,33 @@ function lbHeaders(json) {
   if (json) h['Content-Type'] = 'application/json';
   return h;
 }
+// the server keeps at most 500,000 points per send, so big bursts go out early in 400,000-point pieces
+const LB_CHUNK = 400000, LB_SOON = 300000;
 function lbAdd(pts, kills) {
   if (!LB || !(pts > 0)) return;
   lbPend.score += pts; lbPend.kills += kills || 0;
   showRank();
+  if (lbPend.score >= LB_SOON) lbFlush(false);
 }
 function lbFlush(leaving) {
-  if (!LB || lbBusy || lbFails >= 4 || (lbPend.score < 1 && lbPend.kills < 1)) return;
-  const sent = { score: Math.round(lbPend.score), kills: lbPend.kills }, first = lbFirst;
-  lbPend.score = 0; lbPend.kills = 0; lbFirst = false; lbBusy = true;
+  if (!LB || lbFails >= 4) return;
+  const due = () => lbPend.score >= 1 || lbPend.kills >= 1;
+  if (leaving) { for (let n = 0; n < 8 && due(); n++) lbSend(true); return; } // keepalive requests can run side by side
+  if (!lbBusy && due()) lbSend(false);
+}
+function lbSend(leaving) {
+  const sent = { score: Math.min(LB_CHUNK, Math.round(lbPend.score)), kills: lbPend.kills }, first = lbFirst;
+  lbPend.score = Math.max(0, lbPend.score - sent.score); lbPend.kills = 0; lbFirst = false;
+  if (!leaving) lbBusy = true;
   fetch(`${LB.url}/rest/v1/rpc/smash_add`, {
     method: 'POST', headers: lbHeaders(true), keepalive: !!leaving,
     body: JSON.stringify({ p_code: CFG.code, p_score: sent.score, p_kills: sent.kills, p_new: first }),
-  }).then((r) => { if (!r.ok) throw new Error(r.status); lbFails = 0; lbMine += sent.score; })
-    .catch(() => { lbFails++; lbPend.score += sent.score; lbPend.kills += sent.kills; lbFirst = first; })
-    .finally(() => { lbBusy = false; });
+  }).then((r) => {
+    if (!r.ok) throw new Error(r.status);
+    lbFails = 0; lbMine += sent.score;
+    if (!leaving && lbPend.score >= LB_SOON) setTimeout(() => lbFlush(false), 400);
+  }).catch(() => { lbFails++; lbPend.score += sent.score; lbPend.kills += sent.kills; if (first) lbFirst = true; })
+    .finally(() => { if (!leaving) lbBusy = false; });
 }
 async function lbFetch() {
   if (!LB || document.visibilityState === 'hidden') return;
@@ -3490,7 +3502,8 @@ window.__cau = {
   share: () => openShare(),
   runStats: () => runStats(),
   lb: () => ({ on: !!LB, pend: { ...lbPend }, first: lbFirst, fails: lbFails, board: lbBoard ? lbBoard.length : 0, mine: lbMine, text: $('lb').hidden ? '' : $('lb').textContent }),
-  lbFlush: () => lbFlush(false),
+  lbFlush: (leaving) => lbFlush(!!leaving),
+  lbAdd: (p, k) => lbAdd(p, k),
   lbFetch: () => lbFetch(),
   stats: () => ({ dyn: dyn.size, world: world.size, history: history.length, bombs: bombs.length, frames, fx: fx.length, pixelRatio, trees: TREES.length, coarse: COARSE, phone: PHONE }),
 };
