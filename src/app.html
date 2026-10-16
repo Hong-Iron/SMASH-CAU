@@ -99,6 +99,8 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
 .opt { padding: 5px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); cursor: pointer; font-size: 12.5px; }
 .opt:hover { background: var(--hover); }
 .opt[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.opt.support { display: inline-flex; align-items: center; text-decoration: none; background: #ffdd00; border-color: #e3c300; color: #1f1700; font-weight: 600; }
+.opt.support:hover { background: #ffe640; }
 .count { margin: 0; color: var(--muted); font: 12px var(--font-data); font-variant-numeric: tabular-nums; }
 
 .compass {
@@ -194,8 +196,6 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
   .credit { left: 10px; right: 10px; max-width: none; bottom: calc(3px + env(safe-area-inset-bottom, 0px)); padding: 0; background: none; font-size: 9.5px; text-shadow: 0 1px 2px rgba(255,255,255,.7); }
   .credit .long { display: none; }
   .credit .short { display: inline; }
-  #app.opts-open .credit .long { display: inline; }
-  #app.opts-open .credit { text-shadow: none; background: var(--surface); padding: 2px 6px; border-radius: 4px; }
   .label { font-size: 11px; padding: 1px 6px; }
   #hint { display: block; position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 45; max-width: calc(100% - 40px); padding: 9px 14px; border-radius: 10px; background: rgba(12, 14, 18, .8); color: #fff; font: 600 13px/1.6 var(--font-ui); text-align: center; pointer-events: none; transition: opacity .6s; }
   #hint[hidden] { display: none; }
@@ -281,6 +281,7 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
         <button class="opt" id="t-sound" type="button" aria-pressed="true">소리</button>
         <button class="opt" id="t-home" type="button">처음 시점</button>
         <button class="opt" id="t-top" type="button">위에서 보기</button>
+        <a class="opt support" id="t-support" href="#" target="_blank" rel="noopener" hidden>☕ 개발자 응원하기</a>
       </div>
     </div>
   </div>
@@ -295,7 +296,7 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
     </svg>
   </button>
 
-  <p class="credit"><span class="short">© </span><span class="long">건물·도로 © </span><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap 기여자</a><span class="long"> · 고도 AWS Terrain Tiles (SRTM 30 m 기반) · 건물 겉모습은 실제 사진이 아닌 일반 재질</span></p>
+  <p class="credit"><span class="short">© </span><span class="long">건물·도로 © </span><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap 기여자</a><span class="long"> · 고도 AWS Terrain Tiles (SRTM 30 m 기반) · 건물 겉모습은 실제 사진이 아닌 일반 재질</span> · 학교와 관계없는 비공식 팬 게임</p>
   <p id="toast" hidden></p>
   <p id="hint" hidden>한 손가락으로 끌면 이동 · 두 손가락으로 돌리기와 확대<br>톡 누르면 부서집니다</p>
 
@@ -2797,6 +2798,7 @@ function setTool(t) {
   reticle.scale.setScalar(TOOLS[t].r);
 }
 document.querySelectorAll('.tool').forEach((el) => el.addEventListener('click', () => setTool(el.dataset.tool)));
+if (CFG.support) { const sp = $('t-support'); sp.href = CFG.support; sp.hidden = false; }
 $('undo').addEventListener('click', undo);
 $('more').addEventListener('click', (e) => {
   const open = document.querySelector('.dock').classList.toggle('open');
