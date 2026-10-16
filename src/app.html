@@ -101,6 +101,8 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
 .opt[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
 .opt.support { display: inline-flex; align-items: center; text-decoration: none; background: #ffdd00; border-color: #e3c300; color: #1f1700; font-weight: 600; }
 .opt.support:hover { background: #ffe640; }
+.opt.support.kakao { background: #fee500; border-color: #e0c800; color: #191919; }
+.opt.support.kakao:hover { background: #fff04d; }
 .count { margin: 0; color: var(--muted); font: 12px var(--font-data); font-variant-numeric: tabular-nums; }
 
 .compass {
@@ -281,7 +283,8 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
         <button class="opt" id="t-sound" type="button" aria-pressed="true">소리</button>
         <button class="opt" id="t-home" type="button">처음 시점</button>
         <button class="opt" id="t-top" type="button">위에서 보기</button>
-        <a class="opt support" id="t-support" href="#" target="_blank" rel="noopener" hidden>☕ 개발자 응원하기</a>
+        <a class="opt support kakao" id="t-support-kakao" href="#" target="_blank" rel="noopener" hidden>카카오페이로 응원</a>
+        <a class="opt support" id="t-support" href="#" target="_blank" rel="noopener" hidden>☕ Buy Me a Coffee</a>
       </div>
     </div>
   </div>
@@ -2799,6 +2802,7 @@ function setTool(t) {
 }
 document.querySelectorAll('.tool').forEach((el) => el.addEventListener('click', () => setTool(el.dataset.tool)));
 if (CFG.support) { const sp = $('t-support'); sp.href = CFG.support; sp.hidden = false; }
+if (CFG.supportKakao) { const sp = $('t-support-kakao'); sp.href = CFG.supportKakao; sp.hidden = false; }
 $('undo').addEventListener('click', undo);
 $('more').addEventListener('click', (e) => {
   const open = document.querySelector('.dock').classList.toggle('open');

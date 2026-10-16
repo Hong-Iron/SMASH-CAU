@@ -30,7 +30,10 @@
 
 ## 개발자 응원하기
 
-재미있게 하셨다면 커피 한 잔으로 응원해 주세요: https://buymeacoffee.com/hongiron
+재미있게 하셨다면 커피 한 잔으로 응원해 주세요.
+
+- 카카오페이: https://qr.kakaopay.com/FKcOJKyOy1f405462
+- Buy Me a Coffee (해외 카드): https://buymeacoffee.com/hongiron
 
 ## 데이터와 출처
 
