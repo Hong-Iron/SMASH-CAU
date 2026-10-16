@@ -3116,7 +3116,11 @@ async function makeCard(st) {
     g.fillStyle = fill; g.fillText(t, x, y);
   };
   const DISP = '"Bungee", "IBM Plex Sans KR", Impact, sans-serif', UI = '"IBM Plex Sans KR", "Apple SD Gothic Neo", sans-serif';
-  txt(CFG.title || 'SMASH', 56, 130, `400 92px ${DISP}`, '#ffffff', 'left', '#140b06', 10);
+  let tfs = 92;
+  const titleMax = bestRankIdx >= 0 ? 540 : W - 112;
+  g.font = `400 ${tfs}px ${DISP}`;
+  while (g.measureText(CFG.title || 'SMASH').width > titleMax && tfs > 44) { tfs -= 4; g.font = `400 ${tfs}px ${DISP}`; }
+  txt(CFG.title || 'SMASH', 56, 130, `400 ${tfs}px ${DISP}`, '#ffffff', 'left', '#140b06', Math.max(6, tfs / 9));
   txt(school, 60, 186, `600 34px ${UI}`, 'rgba(255,255,255,.88)');
   if (bestRankIdx >= 0) {
     const r = RANKS[bestRankIdx];
