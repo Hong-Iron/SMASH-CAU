@@ -1,4 +1,4 @@
-<title>SMASH CAU</title>
+<title>__TITLE__</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
@@ -33,14 +33,15 @@
   color-scheme: dark;
 }
 
-html { height: 100%; box-sizing: border-box; }
+html { height: 100%; box-sizing: border-box; overscroll-behavior: none; }
+@supports (height: 100dvh) { html, body { height: 100dvh !important; } }
 [hidden] { display: none !important; }
 *, *::before, *::after { box-sizing: inherit; }
 body { height: 100%; margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 14px; line-height: 1.5; }
 button { font: inherit; color: inherit; }
 button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-#app { position: relative; height: 100%; overflow: hidden; background: #b9cde3; }
+#app { position: relative; height: 100%; overflow: hidden; background: #b9cde3; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
 #stage { position: absolute; inset: 0; }
 #stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
@@ -83,6 +84,9 @@ h1 { margin: 0; font: 400 22px/1.2 "Bungee", Impact, "Arial Black", sans-serif; 
 kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
 
 .acts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+#more { display: none; }
+.credit .short { display: none; }
+#hint { display: none; }
 .act { display: flex; justify-content: center; align-items: baseline; gap: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); cursor: pointer; font-weight: 500; }
 .act:hover:not(:disabled) { background: var(--hover); }
 .act:disabled { opacity: .45; cursor: default; }
@@ -156,34 +160,45 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
 
 @media (max-width: 720px) {
   .side { display: contents; }
-  .hud { top: 84px; width: 150px; gap: 2px; }
-  .rk { font-size: 46px; -webkit-text-stroke-width: 1.5px; }
-  .rw { font-size: 11px; max-width: 150px; }
-  .gauge { width: 110px; height: 5px; }
-  .rko { font-size: 11px; }
-  .score b { font-size: 17px; }
+  .titlebar { position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); left: 10px; right: auto; padding: 6px 12px 7px; border-radius: 8px; }
+  h1 { font-size: 16px; }
+  .hud { top: calc(10px + env(safe-area-inset-top, 0px)); right: 10px; width: 140px; gap: 1px; }
+  .rk { font-size: 40px; -webkit-text-stroke-width: 1.5px; }
+  .rw { font-size: 10px; max-width: 140px; }
+  .gauge { width: 96px; height: 4px; }
+  .rko { font-size: 10.5px; }
+  .score { padding: 2px 8px 3px; }
+  .score b { font-size: 16px; }
   .compass { display: none; }
-  .depth { left: 16px; right: auto; top: 84px; bottom: auto; transform: none; width: calc(100% - 190px); min-width: 0; padding: 7px 9px; }
-  .depth .row:nth-child(2) .lbl { display: none; }
-  .depth .val { font-size: 14px; }
-  .banner { top: 34%; }
-  .titlebar { position: absolute; top: 16px; left: 16px; right: 16px; padding: 10px 14px; }
-  .titlebar .sub { display: none; }
-  .dock { position: absolute; left: 16px; right: 16px; bottom: 40px; padding: 10px; gap: 8px; }
-  .tool { padding: 7px 4px 6px; }
-  .tool .td, .tool kbd, .act kbd, .count { display: none; }
-  .tool svg { width: 22px; height: 22px; }
-  .opt { padding: 4px 8px; font-size: 12px; }
-  .compass { top: 100px; bottom: auto; }
-  .credit { max-width: calc(100% - 32px); bottom: 8px; font-size: 10.5px; }
+  .depth { left: 10px; right: auto; top: calc(52px + env(safe-area-inset-top, 0px)); bottom: auto; transform: none; width: auto; max-width: calc(100% - 170px); min-width: 0; padding: 5px 9px 6px; gap: 1px; }
+  .depth .lbl { display: none; }
+  .depth .val { font-size: 13px; }
+  .depth .lay { font-size: 11.5px; }
+  .banner { top: 30%; }
+  .banner span { font-size: 13px; }
+  .dock { position: absolute; left: 10px; right: 10px; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); padding: 7px; gap: 6px; border-radius: 12px; }
+  .tools { gap: 5px; }
+  .tool { padding: 6px 2px 5px; gap: 1px; border-radius: 8px; }
+  .tool .tn { font-size: 12px; }
+  .tool .td, .tool kbd, .act kbd { display: none; }
+  .tool svg { width: 20px; height: 20px; }
+  .acts { grid-template-columns: 1.3fr 1fr auto; gap: 5px; }
+  .act { padding: 7px 8px; font-size: 13px; }
+  #more { display: flex; min-width: 44px; font-weight: 700; letter-spacing: .08em; }
+  #more[aria-expanded="true"] { background: var(--accent-soft); border-color: var(--accent); }
+  .opts { display: none; }
+  .dock.open .opts { display: flex; }
+  .opt { padding: 5px 9px; font-size: 12px; }
+  .credit { left: 10px; right: 10px; max-width: none; bottom: calc(3px + env(safe-area-inset-bottom, 0px)); padding: 0; background: none; font-size: 9.5px; text-shadow: 0 1px 2px rgba(255,255,255,.7); }
+  .credit .long { display: none; }
+  .credit .short { display: inline; }
+  #app.opts-open .credit .long { display: inline; }
+  #app.opts-open .credit { text-shadow: none; background: var(--surface); padding: 2px 6px; border-radius: 4px; }
+  .label { font-size: 11px; padding: 1px 6px; }
+  #hint { display: block; position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 45; max-width: calc(100% - 40px); padding: 9px 14px; border-radius: 10px; background: rgba(12, 14, 18, .8); color: #fff; font: 600 13px/1.6 var(--font-ui); text-align: center; pointer-events: none; transition: opacity .6s; }
+  #hint[hidden] { display: none; }
+  #hint.fade { opacity: 0; }
 }
-#whiteout { position: absolute; inset: 0; z-index: 60; background: #fff; opacity: 0; pointer-events: none; }
-#app::before, #app::after { content: ""; position: absolute; left: 0; right: 0; height: 0; z-index: 55; background: #050608; transition: height .5s ease; pointer-events: none; }
-#app::before { top: 0; } #app::after { bottom: 0; }
-#app.cine::before, #app.cine::after { height: 11vh; }
-#app.cine .side, #app.cine .depth, #app.cine .compass, #app.cine .credit, #app.cine #labels { opacity: 0; pointer-events: none; transition: opacity .4s; }
-#skip { position: absolute; left: 50%; bottom: 3.5vh; z-index: 58; transform: translateX(-50%); margin: 0; color: rgba(255, 255, 255, .72); font: 500 13px var(--font-ui); pointer-events: none; opacity: 0; transition: opacity .4s; }
-#app.cine #skip { opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
   .label { transition: none; }
   .rk.up, .rk.hit { animation: none; }
@@ -200,7 +215,7 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
   <div id="tip" hidden></div>
 
   <div class="side">
-    <header class="titlebar"><h1>SMASH CAU</h1></header>
+    <header class="titlebar"><h1>__TITLE__</h1></header>
 
     <div class="dock">
       <div class="tools" role="radiogroup" aria-label="부수는 도구">
@@ -244,8 +259,9 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
       <div class="acts">
         <button class="act" id="undo" type="button" disabled>되돌리기 <kbd id="undo-key">Ctrl Z</kbd></button>
         <button class="act" id="reset" type="button" disabled>전부 복구</button>
+        <button class="act" id="more" type="button" aria-expanded="false" aria-controls="opts" aria-label="설정 더 보기">⋯</button>
       </div>
-      <div class="opts">
+      <div class="opts" id="opts">
         <button class="opt" id="t-labels" type="button" aria-pressed="true">이름 표시</button>
         <button class="opt" id="t-sound" type="button" aria-pressed="true">소리</button>
         <button class="opt" id="t-home" type="button">처음 시점</button>
@@ -264,7 +280,8 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
     </svg>
   </button>
 
-  <p class="credit">건물·도로 © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap 기여자</a> · 고도 AWS Terrain Tiles (SRTM 30 m 기반) · 건물 겉모습은 실제 사진이 아닌 일반 재질</p>
+  <p class="credit"><span class="short">© </span><span class="long">건물·도로 © </span><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap 기여자</a><span class="long"> · 고도 AWS Terrain Tiles (SRTM 30 m 기반) · 건물 겉모습은 실제 사진이 아닌 일반 재질</span></p>
+  <p id="hint" hidden>한 손가락으로 끌면 이동 · 두 손가락으로 돌리기와 확대<br>톡 누르면 부서집니다</p>
 
   <div class="hud" id="hud">
     <div class="rank" id="rank"><span class="rk" id="rk">D</span><span class="rw" id="rw"></span><span class="gauge"><i id="gauge"></i></span><span class="rko" id="rko"></span></div>
@@ -306,6 +323,14 @@ import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometr
 const D = JSON.parse(document.getElementById('cau-data').textContent);
 const T = D.terrain;
 const W = (T.nx - 1) * T.step, H = (T.nz - 1) * T.step;
+const CFG = D.config || {};
+const CB = (() => {
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (const r of D.campus) for (const [x, z] of r) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+  return { cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, x0, x1, z0, z1, diag: Math.hypot(x1 - x0, z1 - z0) };
+})();
+const SCALE = Math.max(1, CB.diag / 772);
+const SB = Math.max(400, 0.55 * Math.max(W, H));
 const X1 = T.x0 + W, Z1 = T.z0 + H;
 const root = document.documentElement;
 const $ = (id) => document.getElementById(id);
@@ -327,28 +352,38 @@ function groundY(x, z) {
 
 // ============ renderer, sky, light
 const stage = $('stage');
+// touch devices get a lighter setup; phones lighter still
+const COARSE = matchMedia('(pointer: coarse)').matches;
+const PHONE = COARSE && Math.min(screen.width, screen.height) < 820;
+const PR_MAX = Math.min(devicePixelRatio || 1, COARSE ? 1.5 : 2), PR_MIN = COARSE ? 0.75 : 1;
+let pixelRatio = PR_MAX;
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  renderer = new THREE.WebGLRenderer({ antialias: !(COARSE && devicePixelRatio >= 2), powerPreference: 'high-performance' });
 } catch (err) {
   $('loading').innerHTML = '<p>이 브라우저에서 WebGL을 쓸 수 없어 3D 지도를 그리지 못했습니다.</p>';
   throw err;
 }
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(pixelRatio);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.62;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = COARSE ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 stage.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(38, 1, 1, 7000);
+const camera = new THREE.PerspectiveCamera(38, 1, 1, 7000 * SCALE);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
+if (COARSE) {
+  // map-style touch: one finger pans along the ground, two fingers rotate and zoom
+  controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
+  controls.screenSpacePanning = false;
+}
 controls.maxPolarAngle = Math.PI * 0.47;
 controls.minDistance = 15;
-controls.maxDistance = 1300;
+controls.maxDistance = 1300 * SCALE;
 
 const sunDir = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(48), THREE.MathUtils.degToRad(38));
 const sky = new Sky();
@@ -362,18 +397,19 @@ su.sunPosition.value.copy(sunDir);
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(envScene, 0, 0.1, 200).texture;
   pmrem.dispose();
-  sky.scale.setScalar(5000);
+  sky.scale.setScalar(5000 * SCALE);
   scene.add(sky);
 }
-scene.fog = new THREE.Fog(0xc4d3e2, 800, 3000);
+scene.fog = new THREE.Fog(0xc4d3e2, 800 * SCALE, 3000 * SCALE);
 const hemi = new THREE.HemisphereLight(0xdde8f4, 0x6f6655, 0.45);
 const sun = new THREE.DirectionalLight(0xfff0dc, 3.6);
-sun.position.copy(sunDir).multiplyScalar(700);
+sun.position.copy(sunDir).multiplyScalar(300 + SB);
 sun.target.position.set(0, 0, 0);
 sun.castShadow = true;
-const bigShadow = renderer.capabilities.maxTextureSize >= 8192 && !matchMedia('(pointer: coarse)').matches;
-sun.shadow.mapSize.set(bigShadow ? 4096 : 2048, bigShadow ? 4096 : 2048);
-Object.assign(sun.shadow.camera, { left: -400, right: 400, top: 400, bottom: -400, near: 50, far: 1500 });
+const bigShadow = renderer.capabilities.maxTextureSize >= 8192 && !COARSE;
+const SHADOW = bigShadow ? 4096 : PHONE ? 1024 : 2048;
+sun.shadow.mapSize.set(SHADOW, SHADOW);
+Object.assign(sun.shadow.camera, { left: -SB, right: SB, top: SB, bottom: -SB, near: 50, far: 600 + 3 * SB });
 sun.shadow.bias = -0.0004;
 sun.shadow.normalBias = 0.5;
 scene.add(hemi, sun, sun.target);
@@ -476,7 +512,7 @@ scene.add(new THREE.Mesh(sGeo, new THREE.MeshStandardMaterial({ color: 0x6d6150,
 function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 const ROAD_W = { tertiary: 9, secondary: 11, primary: 13, residential: 6, unclassified: 6, living_street: 5, service: 4, pedestrian: 4.5, track: 3, footway: 2, cycleway: 2, path: 1.6, steps: 2.6 };
 const FOOT = new Set(['footway', 'path', 'steps', 'cycleway', 'pedestrian', 'track']);
-const GPX = 4.5;
+const GPX = Math.min(4.5, Math.floor(Math.min(renderer.capabilities.maxTextureSize, PHONE ? 2048 : 4096) / Math.max(W, H) * 100) / 100);
 function paintGround() {
   const PX = GPX, R = mulberry(84);
   const cw = Math.round(W * PX), ch = Math.round(H * PX);
@@ -486,7 +522,7 @@ function paintGround() {
   const ring = (r) => { r.forEach(([x, z], i) => (i ? g.lineTo(X(x), Y(z)) : g.moveTo(X(x), Y(z)))); g.closePath(); };
   const line = (p) => { g.beginPath(); p.forEach(([x, z], i) => (i ? g.lineTo(X(x), Y(z)) : g.moveTo(X(x), Y(z)))); g.stroke(); };
   g.fillStyle = '#86847a'; g.fillRect(0, 0, cw, ch);
-  g.beginPath(); ring(D.campus); g.fillStyle = '#b1ab9e'; g.fill();
+  g.beginPath(); D.campus.forEach(ring); g.fillStyle = '#b1ab9e'; g.fill();
   // steep ground is planted, flat ground stays paved
   g.fillStyle = '#58703c';
   for (let i = 0; i < T.nz - 1; i++) for (let j = 0; j < T.nx - 1; j++) {
@@ -497,10 +533,11 @@ function paintGround() {
     g.fillRect(X(T.x0 + j * T.step) - 0.5, Y(T.z0 + i * T.step) - 0.5, T.step * PX + 1, T.step * PX + 1);
   }
   g.globalAlpha = 1;
-  g.save(); g.beginPath(); ring(D.campus); g.clip();
+  g.save(); g.beginPath(); D.campus.forEach(ring); g.clip();
+  const joint = Math.max(1.5, 5 / PX) * PX;
   g.strokeStyle = 'rgba(60,55,45,.10)'; g.lineWidth = 1;
-  for (let x = 0; x < cw; x += 1.5 * PX) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, ch); g.stroke(); }
-  for (let y = 0; y < ch; y += 1.5 * PX) { g.beginPath(); g.moveTo(0, y); g.lineTo(cw, y); g.stroke(); }
+  for (let x = 0; x < cw; x += joint) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, ch); g.stroke(); }
+  for (let y = 0; y < ch; y += joint) { g.beginPath(); g.moveTo(0, y); g.lineTo(cw, y); g.stroke(); }
   g.restore();
   const LAND = { res: '#9b978b', park: '#62823f', wood: '#405f2f', pitch: '#3f7d45', water: '#3c6179', construction: '#a08a6c' };
   for (const k of ['res', 'park', 'wood', 'pitch', 'water', 'construction']) {
@@ -552,12 +589,12 @@ function paintGround() {
 paintGround();
 
 // ============ trees (instanced)
-const TREES = D.trees;
+const TREES = PHONE ? D.trees.filter((_, i) => i % 2 === 0) : D.trees;
 const treeHidden = new Uint8Array(TREES.length);
 const trunkGeo = new THREE.CylinderGeometry(0.18, 0.28, 1, 6); trunkGeo.translate(0, 0.5, 0);
 const crownGeo = (() => {
-  const parts = [[0, 0, 0, 1], [0.48, -0.18, 0.22, 0.68], [-0.42, -0.12, -0.26, 0.72], [0.06, 0.44, -0.12, 0.6], [-0.2, -0.2, 0.45, 0.55]].map(([ox, oy, oz, r]) => {
-    const g0 = mergeVertices(new THREE.IcosahedronGeometry(r, 2).deleteAttribute('normal').deleteAttribute('uv'));
+  const parts = [[0, 0, 0, 1], [0.5, -0.16, 0.24, 0.7], [-0.44, -0.1, -0.26, 0.72], [0.04, 0.42, -0.1, 0.62]].map(([ox, oy, oz, r]) => {
+    const g0 = mergeVertices(new THREE.IcosahedronGeometry(r, 1).deleteAttribute('normal').deleteAttribute('uv'));
     const p = g0.attributes.position;
     for (let i = 0; i < p.count; i++) {
       const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
@@ -579,7 +616,7 @@ crownMat.onBeforeCompile = (sh) => {
       diffuseColor.rgb *= (0.62 + 0.62 * leaf) * (0.62 + 0.38 * smoothstep(-0.9, 0.8, vLP.y));`);
 };
 const crowns = new THREE.InstancedMesh(crownGeo, crownMat, TREES.length);
-crowns.castShadow = true; crowns.receiveShadow = true; trunks.castShadow = true;
+crowns.castShadow = !PHONE; crowns.receiveShadow = true; trunks.castShadow = !COARSE;
 {
   const c = new THREE.Color(), R = mulberry(7);
   for (let i = 0; i < TREES.length; i++) {
@@ -698,8 +735,7 @@ float gGlass = 0.0;
 }
 function hashStr(s) { let h = 2166136261; for (const ch of s) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
 function styleOf(b) {
-  if (b.n === '100주년기념관') return 'glass';
-  if (b.n === '영신관') return 'brick';
+  if (CFG.styles && CFG.styles[b.n]) return CFG.styles[b.n];
   const h = hashStr(b.id);
   return ['stone', 'brick', 'concrete', 'glass', 'tan', 'stone'][h % 6];
 }
@@ -1011,7 +1047,7 @@ let liveCount = 0;
 function ensureMesh(p) {
   if (!p.mesh) {
     p.mesh = new THREE.Mesh(getGeo(p.def), B[p.def.bi].mat);
-    p.mesh.castShadow = p.def.size > 1.6; p.mesh.receiveShadow = true;
+    p.mesh.castShadow = !COARSE && p.def.size > 1.6; p.mesh.receiveShadow = !PHONE;
     p.mesh.userData.piece = p;
   }
   p.mesh.position.copy(p.pos); p.mesh.quaternion.copy(p.quat);
@@ -1039,7 +1075,7 @@ function replaceWithKids(p, kids) {
     else release(k);
   }
 }
-const MAXDYN = 2000;
+const MAXDYN = COARSE ? 900 : 2000;
 function capPieces() {
   if (dyn.size <= MAXDYN) return;
   const sorted = [...dyn].sort((a, b) => (b.sleep - a.sleep) || (a.def.size - b.def.size) || (a.born - b.born));
@@ -1580,7 +1616,7 @@ function digAt(cx, cz, r, amount) {
   if (!centerDone && maxDig >= CORE - 0.5) {
     centerDone = true;
     if (curAct) curAct.center = true;
-    banner('지구 중심 도달!', '지하 6,371 km. 여기서 계속 파면 지구 반대편 우루과이 앞바다(남대서양)로 나옵니다.');
+    banner('지구 중심 도달!', `지하 6,371 km. 여기서 계속 파면 지구 반대편 ${CFG.antipode || '바다 건너편'}로 나옵니다.`);
     SFX.core(); addShake(1, null);
   }
   updateDepthHud();
@@ -1728,7 +1764,7 @@ function detonate(c) {
   flashLight.position.copy(c).add(new THREE.Vector3(0, 30, 0));
   fx.push({ obj: flashLight, t: 0, life: 2.4, kind: 'flash', peak: 90000 });
   const RV = 70, RB = 190;
-  let budget = Math.min(1100, Math.max(400, MAXDYN - dyn.size));
+  let budget = Math.min(COARSE ? 500 : 1100, Math.max(COARSE ? 250 : 400, MAXDYN - dyn.size));
   const touched = [];
   for (const b of B) {
     if (!b.statics.size || buildingDist(b, c) > RB) continue;
@@ -2053,14 +2089,20 @@ function hover(e) {
 // ============ labels (names only)
 const labelLayer = $('labels');
 const labels = B.filter((b) => b.campus && b.n).map((b) => {
-  const el = document.createElement('div'); el.className = 'label'; el.textContent = b.n;
+  const el = document.createElement('div'); el.className = 'label'; el.textContent = b.n.replace(/^\S+대학교\s+(?=\S)/, '');
   labelLayer.appendChild(el);
   return { b, el, w: 0, h: 0 };
 });
 const measure = () => labels.forEach((L) => { L.w = L.el.offsetWidth; L.h = L.el.offsetHeight; });
 let showAll = true;
 const tmp = new THREE.Vector3();
-function updateLabels() {
+let labelKey = '', labelTick = 0, obstacles = [], obstaclesAt = -1;
+function updateLabels(force = false) {
+  const m = camera.matrixWorld.elements;
+  const key = `${m[12].toFixed(1)},${m[13].toFixed(1)},${m[14].toFixed(1)},${m[8].toFixed(3)},${m[9].toFixed(3)},${m[10].toFixed(3)},${showAll}`;
+  labelTick++;
+  if (!force && key === labelKey && labelTick % 20) return;
+  labelKey = key;
   const w = stage.clientWidth, h = stage.clientHeight;
   const items = labels.map((L) => {
     tmp.copy(L.b.labelPos);
@@ -2068,15 +2110,28 @@ function updateLabels() {
     tmp.project(camera);
     return { L, x: (tmp.x + 1) / 2 * w, y: (1 - tmp.y) / 2 * h, z: tmp.z, d };
   }).sort((a, b) => a.d - b.d);
-  const placed = [];
+  // names never sit under the panels or the score and rank
+  if (labelTick - obstaclesAt > 30 || force) {
+    obstaclesAt = labelTick;
+    const sr = stage.getBoundingClientRect();
+    obstacles = [];
+    document.querySelectorAll('.titlebar, .dock, #hud, #depth:not([hidden])').forEach((el) => {
+      const r = el.getBoundingClientRect();
+      if (r.width && r.height) obstacles.push([r.left - sr.left - 4, r.top - sr.top - 4, r.width + 8, r.height + 8]);
+    });
+  }
+  const placed = obstacles.slice();
   for (const it of items) {
     const { L } = it;
     let on = showAll && L.b.labelOn && it.z < 1 && it.x > -50 && it.x < w + 50 && it.y > 0 && it.y < h + 20;
     const rx = it.x - L.w / 2 - 3, ry = it.y - L.h - 10, rw = L.w + 6, rh = L.h + 4;
     if (on) on = !placed.some((p) => rx < p[0] + p[2] && p[0] < rx + rw && ry < p[1] + p[3] && p[1] < ry + rh);
     if (on) placed.push([rx, ry, rw, rh]);
-    L.el.classList.toggle('on', on);
-    if (on) L.el.style.transform = `translate(${Math.round(it.x - L.w / 2)}px, ${Math.round(it.y - L.h - 7)}px)`;
+    if (on !== L.on) { L.on = on; L.el.classList.toggle('on', on); }
+    if (on) {
+      const tf = `translate(${Math.round(it.x - L.w / 2)}px, ${Math.round(it.y - L.h - 7)}px)`;
+      if (tf !== L.tf) { L.tf = tf; L.el.style.transform = tf; }
+    }
   }
 }
 
@@ -2087,19 +2142,44 @@ function flyTo(target, pos, ms = 900) {
   anim = { t0: performance.now(), ms, fT: controls.target.clone(), tT: target, fP: camera.position.clone(), tP: pos };
 }
 controls.addEventListener('start', () => { anim = null; });
-const centerY = () => groundY(0, 0);
+// frame the buildings, not the whole campus outline (which can include a mountain)
+const FB = (() => {
+  const xs = D.buildings.map((b) => b.o.reduce((s, p) => s + p[0], 0) / b.o.length).sort((a, b) => a - b);
+  const zs = D.buildings.map((b) => b.o.reduce((s, p) => s + p[1], 0) / b.o.length).sort((a, b) => a - b);
+  if (!xs.length) return CB;
+  const q = (a, f) => a[Math.min(a.length - 1, Math.max(0, Math.round(f * (a.length - 1))))];
+  const x0 = q(xs, 0.04) - 30, x1 = q(xs, 0.96) + 30, z0 = q(zs, 0.04) - 30, z1 = q(zs, 0.96) + 30;
+  return { cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, x0, x1, z0, z1, diag: Math.hypot(x1 - x0, z1 - z0) };
+})();
+const centerY = () => groundY(FB.cx, FB.cz);
+const VIEW_DIR = (() => {
+  let sxx = 0, szz = 0, sxh = 0, szh = 0, sh = 0, n = 0;
+  const pts = [];
+  for (let x = FB.x0; x <= FB.x1; x += 10) for (let z = FB.z0; z <= FB.z1; z += 10) { const h = groundY(x, z); pts.push([x - FB.cx, z - FB.cz, h]); sh += h; n++; }
+  const hm = sh / Math.max(1, n);
+  for (const [x, z, h] of pts) { sxx += x * x; szz += z * z; sxh += x * (h - hm); szh += z * (h - hm); }
+  let dx = -(sxh / Math.max(1, sxx)), dz = -(szh / Math.max(1, szz));
+  const L = Math.hypot(dx, dz);
+  if (L < 1e-3) { dx = 0.92; dz = -0.4; } else { dx /= L; dz /= L; }
+  return new THREE.Vector3(dx, 0, dz);
+})();
 function homeView(instant = false) {
   const aspect = stage.clientWidth / Math.max(1, stage.clientHeight);
-  const f = aspect < 1 ? 1.45 / Math.max(aspect, 0.45) : 1;
-  const target = new THREE.Vector3(-15, centerY() - 5, 15);
-  if (stage.clientWidth > 720) target.add(new THREE.Vector3(0.41, 0, 0.91).multiplyScalar(70));
-  const pos = target.clone().add(new THREE.Vector3(400, 290, -175).multiplyScalar(f));
+  const portrait = aspect < 1;
+  const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * aspect;
+  const dist = portrait ? Math.max(0.6 * FB.diag, 0.31 * FB.diag / tanH) : 0.8 * FB.diag;
+  const elev = portrait ? 0.9 : 0.59;
+  const target = new THREE.Vector3(FB.cx, centerY() - 5, FB.cz);
+  if (stage.clientWidth > 720) target.add(new THREE.Vector3(-VIEW_DIR.z, 0, VIEW_DIR.x).multiplyScalar(0.1 * FB.diag));
+  if (portrait) target.addScaledVector(VIEW_DIR, 0.06 * FB.diag);
+  const pos = target.clone().addScaledVector(VIEW_DIR, dist * Math.cos(elev)).add(new THREE.Vector3(0, dist * Math.sin(elev), 0));
   if (instant) { controls.target.copy(target); camera.position.copy(pos); controls.update(); } else flyTo(target, pos);
 }
 function topView() {
   const aspect = stage.clientWidth / Math.max(1, stage.clientHeight);
-  const target = new THREE.Vector3(0, centerY(), 0);
-  flyTo(target, target.clone().add(new THREE.Vector3(0, aspect < 1 ? 1100 / Math.max(aspect, 0.45) * 0.55 : 780, 0.5)));
+  const target = new THREE.Vector3(FB.cx, centerY(), FB.cz);
+  const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * aspect;
+  flyTo(target, target.clone().add(new THREE.Vector3(0, aspect < 1 ? Math.max(0.6 * FB.diag, 0.36 * FB.diag / tanH) : FB.diag * 1.1, 0.5)));
 }
 function northUp() {
   const off = camera.position.clone().sub(controls.target);
@@ -2114,6 +2194,23 @@ function setTool(t) {
 }
 document.querySelectorAll('.tool').forEach((el) => el.addEventListener('click', () => setTool(el.dataset.tool)));
 $('undo').addEventListener('click', undo);
+$('more').addEventListener('click', (e) => {
+  const open = document.querySelector('.dock').classList.toggle('open');
+  appEl.classList.toggle('opts-open', open);
+  e.currentTarget.setAttribute('aria-expanded', String(open));
+  obstaclesAt = -99;
+});
+renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+if (COARSE) {
+  let seen = false;
+  try { seen = localStorage.getItem('smash-hint') === '1'; } catch (e) { /* storage blocked */ }
+  if (!seen) {
+    const hint = $('hint'); hint.hidden = false;
+    const hide = () => { hint.classList.add('fade'); setTimeout(() => { hint.hidden = true; }, 700); try { localStorage.setItem('smash-hint', '1'); } catch (e) { /* storage blocked */ } };
+    setTimeout(hide, 4500);
+    renderer.domElement.addEventListener('pointerdown', hide, { once: true });
+  }
+}
 $('reset').addEventListener('click', resetAll);
 $('t-home').addEventListener('click', () => homeView());
 $('t-top').addEventListener('click', topView);
@@ -2138,7 +2235,9 @@ function resize() {
   const w = stage.clientWidth, h = stage.clientHeight;
   renderer.setSize(w, h, false);
   camera.aspect = w / Math.max(1, h);
+  camera.fov = camera.aspect < 1 ? 52 : 38;
   camera.updateProjectionMatrix();
+  labelKey = ''; obstaclesAt = -99;
 }
 new ResizeObserver(resize).observe(stage);
 const needle = $('needle');
@@ -2156,8 +2255,18 @@ function simulate(rdt, now) {
   if (fogHeat > 0) { fogHeat = Math.max(0, fogHeat - rdt / 10); scene.fog.color.copy(fogBase).lerp(fogHot, fogHeat * 0.7); }
   if (shockAt && now >= shockAt) { shockAt = 0; trauma = 1; SFX.nuke(); }
 }
+let perfT = 0, perfN = 0, raiseAfter = 0;
+function adaptQuality(realDt, now) {
+  perfT += realDt; perfN++;
+  if (perfT < 2) return;
+  const fps = perfN / perfT; perfT = 0; perfN = 0;
+  if (fps < 45 && pixelRatio > PR_MIN) { pixelRatio = Math.max(PR_MIN, pixelRatio - 0.25); renderer.setPixelRatio(pixelRatio); resize(); raiseAfter = now + 10000; }
+  else if (fps > 58 && pixelRatio < PR_MAX && now > raiseAfter) { pixelRatio = Math.min(PR_MAX, pixelRatio + 0.25); renderer.setPixelRatio(pixelRatio); resize(); raiseAfter = now + 10000; }
+}
 function frame(now) {
-  const rdt = Math.min(0.033, (now - last) / 1000); last = now; frames++;
+  const realDt = Math.min(0.5, (now - last) / 1000);
+  const rdt = Math.min(0.033, realDt); last = now; frames++;
+  if (!document.hidden) adaptQuality(realDt, now);
   if (anim && !cine) {
     const t = Math.min(1, (now - anim.t0) / anim.ms);
     const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -2212,8 +2321,9 @@ window.__cau = {
   },
   bombAt(x, z) { pushHistory(); dropBomb(new THREE.Vector3(x, groundY(x, z) + 1.2, z)); },
   deep: () => ({ x: deepX, z: deepZ, d: maxDig, gy: groundY(deepX, deepZ), score, style, rank: rankIdx, layer: layerMax, center: centerDone }),
+  cam: () => ({ p: camera.position.toArray(), t: controls.target.toArray() }),
   look(px, py, pz, tx, ty, tz) { anim = null; camera.position.set(px, py, pz); controls.target.set(tx, ty, tz); controls.update(); },
-  undo, stats: () => ({ dyn: dyn.size, world: world.size, history: history.length, bombs: bombs.length, frames, fx: fx.length }),
+  undo, stats: () => ({ dyn: dyn.size, world: world.size, history: history.length, bombs: bombs.length, frames, fx: fx.length, pixelRatio, trees: TREES.length, coarse: COARSE, phone: PHONE }),
 };
 window.__cauReady = true;
 $('loading').hidden = true;

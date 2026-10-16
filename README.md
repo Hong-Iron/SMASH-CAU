@@ -32,10 +32,13 @@
 
 ## 만든 방법
 
+- 같은 방식으로 만든 다른 학교: [SMASH SSU](https://github.com/Hong-Iron/SMASH-SSU), [SMASH SNU](https://github.com/Hong-Iron/SMASH-SNU)
 - 3D는 three.js r160(CDN), 소리는 Web Audio로 합성합니다. 소리 파일은 없습니다.
-- 페이지 만들기: `src/app.html` + `data/campus.json` → `python3 tools/assemble.py` → `site/index.html`
+- 학교 이름, 주소, 미리보기 문구, 건물별 재질 지정은 `config.json`에 있습니다.
+- 페이지 만들기: `src/app.html` + `data/campus.json` + `config.json` → `python3 tools/assemble.py` → `site/index.html`
 - 데이터 다시 만들기 (numpy, matplotlib 필요):
-  1. `sh tools/fetch.sh raw`
+  1. `python3 tools/fetch.py way 284355223 raw`
   2. `python3 tools/build_campus.py raw raw/campus_raw.json`
   3. `python3 tools/add_trees.py raw/campus_raw.json data/campus.json`
+  - 100주년기념관 층수(지상 12층)는 OpenStreetMap에 없어서 지금 `data/campus.json`에만 들어 있습니다. 데이터를 다시 만들면 직접 넣어야 합니다.
 - `main`에 push하면 GitHub Actions가 `site/` 폴더를 GitHub Pages에 올립니다.

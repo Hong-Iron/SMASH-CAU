@@ -1,5 +1,5 @@
 # Adds deterministic tree positions (in wood/park areas, away from buildings and roads) and trims fields.
-# usage: python -I add_trees.py <in.json> <out.json>
+# usage: python3 tools/add_trees.py <in.json> <out.json>
 import json, math, random, sys
 d = json.load(open(sys.argv[1]))
 rnd = random.Random(84)
@@ -81,11 +81,11 @@ for t in trees:
     k = (round(t[0]/2.5), round(t[1]/2.5))
     if k in seen: continue
     seen.add(k); out.append(t)
+MAX_TREES = 7000   # keeps big campuses (and their forests) light enough to draw
+if len(out) > MAX_TREES:
+    out = sorted(rnd.sample(out, MAX_TREES))
 d["trees"] = out
-for b in d["buildings"]:
-    for f in ("en", "ref", "src", "hs", "est", "ug"):
-        b.pop(f, None)
-d.pop("origin", None)
+
 json.dump(d, open(sys.argv[2], "w"), ensure_ascii=False, separators=(",", ":"))
 import os
 print("trees:", len(out), "json KB:", os.path.getsize(sys.argv[2])//1024)

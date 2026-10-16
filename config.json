@@ -1,0 +1,20 @@
+{
+  "code": "CAU",
+  "title": "SMASH CAU",
+  "school": "중앙대",
+  "fullName": "중앙대학교",
+  "campusName": "중앙대학교 서울캠퍼스",
+  "tagline": "중앙대를 부셔 (시험기간 스트레스 해소)",
+  "description": "중앙대학교 서울캠퍼스를 3D로 부수고 지구 중심까지 파 내려가는 스트레스 해소 게임",
+  "ogAlt": "폭탄이 터지며 무너지는 중앙대학교 서울캠퍼스 3D 화면과 SMASH CAU 제목",
+  "url": "https://hong-iron.github.io/SMASH-CAU/",
+  "antipode": "우루과이 앞바다(남대서양)",
+  "osm": {
+    "type": "way",
+    "id": 284355223
+  },
+  "styles": {
+    "100주년기념관": "glass",
+    "영신관": "brick"
+  }
+}
