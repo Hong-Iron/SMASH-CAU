@@ -1,4 +1,4 @@
-<title>__TITLE__</title>
+<title>__PAGE_TITLE__</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
@@ -146,6 +146,8 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
 .credit a { color: inherit; pointer-events: auto; }
 .overlay { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; background: var(--bg); color: var(--muted); text-align: center; }
 .overlay p { max-width: 36ch; margin: 0; }
+.overlay .intro { display: grid; justify-items: center; gap: 10px; }
+.overlay .about { max-width: 44ch; font-size: 13px; line-height: 1.6; }
 
 /* style rank HUD: a game overlay with its own fixed colours, readable over the bright sky */
 .hud { position: absolute; top: 16px; right: 16px; width: 260px; display: grid; justify-items: end; gap: 4px; pointer-events: none; text-align: right; }
@@ -388,7 +390,7 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
   <div id="whiteout"></div>
   <p id="skip">누르거나 Esc를 누르면 건너뜁니다</p>
 
-  <div class="overlay" id="loading"><p>3D 장면을 만드는 중입니다…</p></div>
+  <div class="overlay" id="loading"><div class="intro"><p>3D 장면을 만드는 중입니다…</p><p class="about">__INTRO__</p><noscript><p>이 게임은 JavaScript를 켜야 할 수 있습니다.</p></noscript></div></div>
 </div>
 
 <script type="application/json" id="cau-data">__CAU_DATA__</script>
