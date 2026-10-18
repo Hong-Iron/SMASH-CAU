@@ -30,6 +30,12 @@ ld = {
     "about": {"@type": "CollegeOrUniversity", "name": cfg.get("fullName") or school},
 }
 if cfg.get("hub"): ld["isPartOf"] = {"@type": "WebSite", "name": "SMASH 대학교", "url": cfg["hub"]}
+# breadcrumb: Google shows it in place of the bare address, e.g. "Hong-Iron › SMASH 대학교 › 중앙대"
+crumbs = [("Hong-Iron", "https://hong-iron.github.io/")]
+if cfg.get("hub"): crumbs.append(("SMASH 대학교", cfg["hub"]))
+crumbs.append((school, url))
+ld = [ld, {"@context": "https://schema.org", "@type": "BreadcrumbList",
+           "itemListElement": [{"@type": "ListItem", "position": i + 1, "name": n, "item": u} for i, (n, u) in enumerate(crumbs)]}]
 ld_tag = '<script type="application/ld+json">' + json.dumps(ld, ensure_ascii=False).replace("</", "<\\/") + "</script>\n"
 gc = f'<script data-goatcounter="{e(cfg["goatcounter"])}" async src="https://gc.zgo.at/count.js"></script>\n' if cfg.get("goatcounter") else ""
 doc = f"""<!doctype html>
