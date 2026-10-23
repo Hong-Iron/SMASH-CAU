@@ -115,6 +115,21 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
 #share-modal .note { margin: 0; font-size: 12px; color: var(--muted); }
 #toast { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); z-index: 80; max-width: calc(100% - 40px); margin: 0; padding: 8px 14px; border-radius: 10px; background: rgba(12, 14, 18, .82); color: #fff; font: 600 13px/1.5 var(--font-ui); text-align: center; pointer-events: none; transition: opacity .5s; }
 #toast.fade { opacity: 0; }
+/* support: a one-time card at a big moment, and a line in the share window */
+#cheer { position: absolute; right: 16px; bottom: 76px; z-index: 60; display: grid; gap: 10px; width: 300px; padding: 12px 12px 12px 14px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 14px 40px rgba(0, 0, 0, .28); animation: cheer-in .35s ease-out; }
+#cheer .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+#cheer b { font-size: 15px; font-weight: 700; }
+#cheer .msg { margin: -4px 0 0; font-size: 13px; color: var(--muted); }
+#cheer .x { width: 28px; height: 28px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: 19px; line-height: 1; cursor: pointer; }
+#cheer .x:hover { background: var(--hover); color: var(--fg); }
+#cheer .acts, .share-cheer .acts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+#cheer .acts a, .share-cheer .acts a { padding: 8px 10px; border-radius: 8px; color: #191919; font: 600 13px var(--font-ui); text-align: center; text-decoration: none; white-space: nowrap; }
+#cheer .kakao, .share-cheer .kakao { background: #fee500; }
+#cheer .bmc, .share-cheer .bmc { background: #ffdd00; }
+.share-cheer { display: grid; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--hover); }
+.share-cheer > span { font-size: 13px; font-weight: 700; }
+@keyframes cheer-in { from { opacity: 0; transform: translateY(10px); } }
+@media (prefers-reduced-motion: reduce) { #cheer { animation: none; } }
 .act { display: flex; justify-content: center; align-items: baseline; gap: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); cursor: pointer; font-weight: 500; }
 .act:hover:not(:disabled) { background: var(--hover); }
 .act:disabled { opacity: .45; cursor: default; }
@@ -214,6 +229,7 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
   .lb { padding: 2px 7px 3px; font-size: 10.5px; }
   .lb .sub { font-size: 10px; }
   .compass { display: none; }
+  #cheer { left: 10px; right: 10px; width: auto; bottom: calc(var(--dock-h, 170px) + 18px); }
   .depth { left: 10px; right: auto; top: calc(var(--title-h, 42px) + 16px + env(safe-area-inset-top, 0px)); bottom: auto; transform: none; width: auto; max-width: calc(100% - 170px); min-width: 0; padding: 5px 9px 6px; gap: 1px; }
   .depth .lbl { display: none; }
   .depth .val { font-size: 13px; }
@@ -358,6 +374,11 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
 
   <p class="credit"><span class="short">© </span><span class="long">건물·도로 © </span><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap 기여자</a><span class="long"> · 고도 AWS Terrain Tiles (SRTM 30 m 기반) · 건물 겉모습은 실제 사진이 아닌 일반 재질</span> · 학교와 관계없는 비공식 팬 게임</p>
   <p id="toast" hidden></p>
+  <div id="cheer" role="dialog" aria-label="개발자 응원" hidden>
+    <div class="top"><b id="cheer-title"></b><button type="button" class="x" id="cheer-close" aria-label="닫기">&times;</button></div>
+    <p class="msg">작은 후원이 큰 힘이 됩니다!</p>
+    <div class="acts"><a class="kakao" id="cheer-kakao" href="#" target="_blank" rel="noopener">카카오페이로 응원</a><a class="bmc" id="cheer-bmc" href="#" target="_blank" rel="noopener">Buy Me a Coffee</a></div>
+  </div>
   <div id="rewind-fx" aria-hidden="true"><span>◀◀ REWIND</span></div>
   <div id="share-modal" hidden role="dialog" aria-modal="true" aria-labelledby="share-title">
     <div class="sheet">
@@ -371,6 +392,7 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
         <button class="act" id="share-go" type="button" hidden>다른 앱으로</button>
         <button class="act" id="share-close" type="button">닫기</button>
       </div>
+      <div class="share-cheer" id="share-cheer" hidden><span>작은 후원이 큰 힘이 됩니다!</span><div class="acts"><a class="kakao" id="share-cheer-kakao" href="#" target="_blank" rel="noopener">카카오페이로 응원</a><a class="bmc" id="share-cheer-bmc" href="#" target="_blank" rel="noopener">Buy Me a Coffee</a></div></div>
       <p class="note" id="share-note"></p>
     </div>
   </div>
@@ -2354,6 +2376,7 @@ function updateCine(rdt) {
 function endCine() {
   if (!cine) return;
   if (cine.phase === 'fall') { cine.t = cine.T; return; }
+  const kind = cine.kind;
   controls.target.copy(lookTmp); controls.enabled = true; controls.update();
   cine = null; timeScale = 1;
   appEl.classList.remove('cine');
@@ -2585,6 +2608,7 @@ function endAct() {
   const gained = Math.round(pts * (r ? r.mult : 1));
   score += gained;
   lbAdd(gained, kills);
+  countPlay();
   popup(a.pt, gained, tags, r);
   refreshRank(true);
 }
@@ -3025,6 +3049,32 @@ document.querySelectorAll('.tool').forEach((el) => el.addEventListener('click', 
 if (CFG.support || CFG.supportKakao) $('support-row').hidden = false;
 if (CFG.support) { const sp = $('t-support'); sp.href = CFG.support; sp.hidden = false; }
 if (CFG.supportKakao) { const sp = $('t-support-kakao'); sp.href = CFG.supportKakao; sp.hidden = false; }
+// ---- support card: never on the first play; on the 3rd, 6th and 10th play, then every 5th (15, 20, 25 …),
+//      once, a moment after the first hit of that play. A play is a page visit with at least one hit.
+//      The share window always carries a support line.
+const HAS_SUPPORT = !!(CFG.support || CFG.supportKakao);
+const cheerPlay = (n) => n === 3 || n === 6 || n === 10 || (n > 10 && n % 5 === 0);
+let cheerTimer = 0, playCounted = false;
+for (const [id, url] of [['cheer-kakao', CFG.supportKakao], ['share-cheer-kakao', CFG.supportKakao], ['cheer-bmc', CFG.support], ['share-cheer-bmc', CFG.support]]) {
+  const a = $(id); if (url) a.href = url; else a.hidden = true;
+}
+$('share-cheer').hidden = !HAS_SUPPORT;
+function cheer(n, now) {
+  if (!HAS_SUPPORT) return;
+  $('cheer-title').textContent = `${n.toLocaleString('ko-KR')}판째 플레이중이세요!`;
+  clearTimeout(cheerTimer);
+  cheerTimer = setTimeout(function show() {
+    if (cine || rewind || !$('share-modal').hidden) { cheerTimer = setTimeout(show, 1500); return; }   // never on top of a cinematic or the share window
+    $('cheer').hidden = false; gcEvent('cheer-show');
+  }, now ? 0 : 2500);
+}
+function countPlay() {
+  if (playCounted) return;
+  playCounted = true;
+  const n = (+recall('smash-plays') || 0) + 1; store('smash-plays', n);
+  if (cheerPlay(n)) cheer(n);
+}
+$('cheer-close').addEventListener('click', () => { $('cheer').hidden = true; gcEvent('cheer-close'); });
 // ---- night mode
 const stars = (() => {
   const n = 1400, pos = new Float32Array(n * 3), col = new Float32Array(n * 3), rr = mulberry(99), R = 4200 * SCALE;
@@ -3245,6 +3295,8 @@ function gcEvent(path) {
 [['share', 'share-open'], ['share-kakao', 'share-kakao'], ['share-insta', 'share-insta'], ['share-save', 'share-save'], ['share-copy', 'share-copy'],
   ['t-support-kakao', 'support-kakaopay'], ['t-support', 'support-bmc'], ['hub-link', 'hub-link'], ['lb', 'rank-link']]
   .forEach(([id, path]) => { const el = $(id); if (el) el.addEventListener('click', () => gcEvent(path)); });
+[['cheer-kakao', 'cheer-kakaopay'], ['cheer-bmc', 'cheer-bmc'], ['share-cheer-kakao', 'share-cheer-kakaopay'], ['share-cheer-bmc', 'share-cheer-bmc']]
+  .forEach(([id, path]) => $(id).addEventListener('click', () => gcEvent(path)));
 
 // ---- school leaderboard: points also go to the school's daily total (Supabase), the HUD shows today's national rank
 const LB = CFG.supabaseUrl && CFG.supabaseKey && CFG.code ? { url: CFG.supabaseUrl.replace(/\/+$/, ''), key: CFG.supabaseKey } : null;
@@ -3324,7 +3376,12 @@ if (LB) {
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') lbFlush(true); else lbFetch(); });
   addEventListener('pagehide', () => lbFlush(true));
 }
-const syncTitleH = () => root.style.setProperty('--title-h', `${Math.round(document.querySelector('.titlebar').getBoundingClientRect().height)}px`);
+const syncTitleH = () => {
+  root.style.setProperty('--title-h', `${Math.round(document.querySelector('.titlebar').getBoundingClientRect().height)}px`);
+  // on phones the support card sits just above the bottom tool dock
+  const dock = document.querySelector('.dock').getBoundingClientRect();
+  root.style.setProperty('--dock-h', `${Math.max(0, Math.round(stage.clientHeight - dock.top))}px`);
+};
 syncTitleH(); addEventListener('resize', syncTitleH); if (document.fonts) document.fonts.ready.then(syncTitleH);
 $('t-night').addEventListener('click', () => { setNight(!night); store('smash-night', night ? 1 : 0); });
 setNight(recall('smash-night') === '1');
@@ -3506,6 +3563,7 @@ window.__cau = {
   lb: () => ({ on: !!LB, pend: { ...lbPend }, first: lbFirst, fails: lbFails, board: lbBoard ? lbBoard.length : 0, mine: lbMine, text: $('lb').hidden ? '' : $('lb').textContent }),
   lbFlush: (leaving) => lbFlush(!!leaving),
   lbAdd: (p, k) => lbAdd(p, k),
+  cheer: (n) => cheer(n || 3, true),
   lbFetch: () => lbFetch(),
   stats: () => ({ dyn: dyn.size, world: world.size, history: history.length, bombs: bombs.length, frames, fx: fx.length, pixelRatio, trees: TREES.length, coarse: COARSE, phone: PHONE }),
 };
