@@ -473,6 +473,7 @@ const CB = (() => {
   return { cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, x0, x1, z0, z1, diag: Math.hypot(x1 - x0, z1 - z0) };
 })();
 const SCALE = Math.max(1, CB.diag / 772);
+const LASER_MAX = Math.round(Math.max(520, CB.diag * 0.9));   // 한 번에 그릴 수 있는 레이저 길이(m): 큰 캠퍼스는 끝에서 끝까지 닿게
 const SB = Math.max(400, 0.55 * Math.max(W, H));
 const X1 = T.x0 + W, Z1 = T.z0 + H;
 const root = document.documentElement;
@@ -1895,15 +1896,15 @@ function updateSwings(dt) {
 const laserLight = new THREE.PointLight(0xff3a6a, 0, 120, 1.3);
 scene.add(laserLight);
 const laserLine = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xff2a55, transparent: true, opacity: 0.95, depthTest: false }));
-laserLine.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3 * 800), 3));
+laserLine.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3 * 2400), 3));
 laserLine.frustumCulled = false; laserLine.renderOrder = 7; laserLine.visible = false;
 scene.add(laserLine);
 let laserDraw = null, laserBeam = null;
 function showLaserPath(pts) {
   const a = laserLine.geometry.attributes.position;
-  pts.slice(0, 800).forEach((q, i) => a.setXYZ(i, q.x, q.y + 0.8, q.z));
+  pts.slice(0, 2400).forEach((q, i) => a.setXYZ(i, q.x, q.y + 0.8, q.z));
   a.needsUpdate = true;
-  laserLine.geometry.setDrawRange(0, Math.min(800, pts.length));
+  laserLine.geometry.setDrawRange(0, Math.min(2400, pts.length));
   laserLine.visible = pts.length > 1;
 }
 function makeBeam() {
@@ -1943,7 +1944,7 @@ function fireLaser(pts) {
   const len = (path.length - 1) * 1.5;
   const flare = new THREE.Sprite(new THREE.SpriteMaterial({ map: FIRE, color: new THREE.Color(4, 1, 2.2), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
   scene.add(flare);
-  laserBeam = { path, phase: 'charge', ct: 0, t: 0, dur: Math.min(2.4, Math.max(0.8, len / 120)), idx: 0, mesh: makeBeam(), flare, molten: makeMolten(path),
+  laserBeam = { path, phase: 'charge', ct: 0, t: 0, dur: Math.min(2.4 + Math.max(0, len - 520) / 800, Math.max(0.8, len / 120)), idx: 0, mesh: makeBeam(), flare, molten: makeMolten(path),
     touched: new Set(), digs: [], lastFlush: 0, moltenY: 0, nextBurst: 0, nextRing: 0,
     act: { tool: 'laser', pt: path[Math.floor(path.length / 2)].clone(), vol: 0, splits: 0, air: 0, dug: 0, layer: -1, center: false,
       pre: [path.length > 3 ? '궤도 레이저 절단!' : '궤도 레이저 명중'], bonus: path.length > 3 ? 400 + len * 4 : 200 } };
@@ -2066,7 +2067,7 @@ function updateLaser(dt) {
   if (k >= 1 && L.idx >= L.path.length) finishLaser();
 }
 function finishLaser() {
-  const L = laserBeam; laserBeam = null;
+  const L = laserBeam; laserBeam = null; laserLine.material.color.set(0xff2a55);
   scene.remove(L.mesh); laserLight.intensity = 0;
   const prev = curAct; curAct = L.act;
   for (const b of L.touched) { support(b); wakeNear(b.x0, b.x1, b.z0, b.z1); rebuildStatic(b); }
@@ -2088,6 +2089,7 @@ function finishLaser() {
   curAct = prev;
 }
 function cancelLaser() {
+  laserLine.material.color.set(0xff2a55);
   if (laserDraw) { laserDraw = null; controls.enabled = !cine; laserLine.visible = false; }
   if (laserBeam) { scene.remove(laserBeam.mesh); scene.remove(laserBeam.flare); scene.remove(laserBeam.molten); laserBeam = null; laserLight.intensity = 0; laserLine.visible = false; laserLine.material.opacity = 0.95; expoDip = 0; }
 }
@@ -2885,7 +2887,8 @@ stage.addEventListener('pointerdown', (e) => {
   const h = pickAt(e.clientX, e.clientY);
   if (!h) return;
   controls.enabled = false;
-  laserDraw = { id: e.pointerId, pts: [h.point.clone()], len: 0 };
+  laserDraw = { id: e.pointerId, pts: [h.point.clone()], len: 0, full: false };
+  laserLine.material.color.set(0xff2a55);
   showLaserPath(laserDraw.pts);
 }, { capture: true });
 stage.addEventListener('pointermove', (e) => {
@@ -2894,7 +2897,15 @@ stage.addEventListener('pointermove', (e) => {
   if (!h) return;
   const last = laserDraw.pts[laserDraw.pts.length - 1];
   const d = Math.hypot(h.point.x - last.x, h.point.z - last.z);
-  if (d < 2 || laserDraw.len + d > 520) return;
+  if (d < 2 || laserDraw.full) return;
+  const room = LASER_MAX - laserDraw.len;
+  if (d > room) {   // 한도에 닿음: 남은 길이만큼만 잇고 선을 노랗게 바꿔 알린다
+    if (room > 0.5) { const q = last.clone().lerp(h.point, room / d); q.y = groundY(q.x, q.z); laserDraw.pts.push(q); laserDraw.len = LASER_MAX; }
+    laserDraw.full = true; laserLine.material.color.set(0xffc23a);
+    toast(`레이저 최대 길이(${LASER_MAX} m)에 닿았어요. 손을 떼면 여기까지 쏩니다.`);
+    showLaserPath(laserDraw.pts);
+    return;
+  }
   laserDraw.len += d; laserDraw.pts.push(h.point.clone());
   showLaserPath(laserDraw.pts);
 }, { capture: true });
