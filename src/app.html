@@ -127,6 +127,7 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
 #cheer .acts a, .share-cheer .acts a { padding: 8px 10px; border-radius: 8px; color: #191919; font: 600 13px var(--font-ui); text-align: center; text-decoration: none; white-space: nowrap; }
 #cheer .kakao, .share-cheer .kakao { background: #fee500; }
 #cheer .bmc, .share-cheer .bmc { background: #ffdd00; }
+#cheer .acts a.toss, .share-cheer .acts a.toss { background: #3182f6; color: #fff; }
 .share-cheer { display: grid; gap: 8px; margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--hover); }
 .share-cheer > span { font-size: 13px; font-weight: 700; }
 @keyframes cheer-in { from { opacity: 0; transform: translateY(10px); } }
@@ -147,6 +148,8 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
 .opt.support:hover { background: #ffe640; }
 .opt.support.kakao { background: #fee500; border-color: #e0c800; color: #191919; }
 .opt.support.kakao:hover { background: #fff04d; }
+.opt.support.toss { background: #3182f6; border-color: #1b64da; color: #fff; }
+.opt.support.toss:hover { background: #4b91f7; }
 .count { margin: 0; color: var(--muted); font: 12px var(--font-data); font-variant-numeric: tabular-nums; }
 
 .compass {
@@ -359,6 +362,7 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
       </div>
       <div class="support-row" id="support-row" hidden>
         <a class="opt support kakao" id="t-support-kakao" href="#" target="_blank" rel="noopener" hidden>카카오페이로 응원</a>
+        <a class="opt support toss" id="t-support-toss" href="#" hidden>토스로 응원</a>
         <a class="opt support" id="t-support" href="#" target="_blank" rel="noopener" hidden>☕ Buy Me a Coffee</a>
       </div>
     </div>
@@ -379,7 +383,7 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
   <div id="cheer" role="dialog" aria-label="개발자 응원" hidden>
     <div class="top"><b id="cheer-title"></b><button type="button" class="x" id="cheer-close" aria-label="닫기">&times;</button></div>
     <p class="msg">작은 후원이 큰 힘이 됩니다!</p>
-    <div class="acts"><a class="kakao" id="cheer-kakao" href="#" target="_blank" rel="noopener">카카오페이로 응원</a><a class="bmc" id="cheer-bmc" href="#" target="_blank" rel="noopener">Buy Me a Coffee</a></div>
+    <div class="acts"><a class="kakao" id="cheer-kakao" href="#" target="_blank" rel="noopener">카카오페이로 응원</a><a class="toss" id="cheer-toss" href="#">토스로 응원</a><a class="bmc" id="cheer-bmc" href="#" target="_blank" rel="noopener">Buy Me a Coffee</a></div>
   </div>
   <div id="rewind-fx" aria-hidden="true"><span>◀◀ REWIND</span></div>
   <div id="share-modal" hidden role="dialog" aria-modal="true" aria-labelledby="share-title">
@@ -394,7 +398,7 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
         <button class="act" id="share-go" type="button" hidden>다른 앱으로</button>
         <button class="act" id="share-close" type="button">닫기</button>
       </div>
-      <div class="share-cheer" id="share-cheer" hidden><span>작은 후원이 큰 힘이 됩니다!</span><div class="acts"><a class="kakao" id="share-cheer-kakao" href="#" target="_blank" rel="noopener">카카오페이로 응원</a><a class="bmc" id="share-cheer-bmc" href="#" target="_blank" rel="noopener">Buy Me a Coffee</a></div></div>
+      <div class="share-cheer" id="share-cheer" hidden><span>작은 후원이 큰 힘이 됩니다!</span><div class="acts"><a class="kakao" id="share-cheer-kakao" href="#" target="_blank" rel="noopener">카카오페이로 응원</a><a class="toss" id="share-cheer-toss" href="#">토스로 응원</a><a class="bmc" id="share-cheer-bmc" href="#" target="_blank" rel="noopener">Buy Me a Coffee</a></div></div>
       <p class="note" id="share-note"></p>
     </div>
   </div>
@@ -3059,16 +3063,17 @@ $('quake-mag').addEventListener('input', (e) => { setQuakeMag(parseFloat(e.targe
 setBatSize(parseFloat(recall('smash-bat')) || 1);
 setQuakeMag(parseFloat(recall('smash-quake')) || 9);
 document.querySelectorAll('.tool').forEach((el) => el.addEventListener('click', () => setTool(el.dataset.tool)));
-if (CFG.support || CFG.supportKakao) $('support-row').hidden = false;
+if (CFG.support || CFG.supportKakao || CFG.supportToss) $('support-row').hidden = false;
 if (CFG.support) { const sp = $('t-support'); sp.href = CFG.support; sp.hidden = false; }
 if (CFG.supportKakao) { const sp = $('t-support-kakao'); sp.href = CFG.supportKakao; sp.hidden = false; }
+if (CFG.supportToss) { const sp = $('t-support-toss'); sp.href = CFG.supportToss; sp.hidden = false; }
 // ---- support card: never on the first play; on the 3rd, 6th and 10th play, then every 5th (15, 20, 25 …),
 //      once, a moment after the first hit of that play. A play is a page visit with at least one hit.
 //      The share window always carries a support line.
-const HAS_SUPPORT = !!(CFG.support || CFG.supportKakao);
+const HAS_SUPPORT = !!(CFG.support || CFG.supportKakao || CFG.supportToss);
 const cheerPlay = (n) => n === 3 || n === 6 || n === 10 || (n > 10 && n % 5 === 0);
 let cheerTimer = 0, playCounted = false;
-for (const [id, url] of [['cheer-kakao', CFG.supportKakao], ['share-cheer-kakao', CFG.supportKakao], ['cheer-bmc', CFG.support], ['share-cheer-bmc', CFG.support]]) {
+for (const [id, url] of [['cheer-kakao', CFG.supportKakao], ['share-cheer-kakao', CFG.supportKakao], ['cheer-toss', CFG.supportToss], ['share-cheer-toss', CFG.supportToss], ['cheer-bmc', CFG.support], ['share-cheer-bmc', CFG.support]]) {
   const a = $(id); if (url) a.href = url; else a.hidden = true;
 }
 $('share-cheer').hidden = !HAS_SUPPORT;
@@ -3306,10 +3311,22 @@ function gcEvent(path) {
   try { const g = window.goatcounter; if (g && g.count) g.count({ path, title: CFG.code || '', event: true }); } catch (e) { /* blocked by the browser */ }
 }
 [['share', 'share-open'], ['share-kakao', 'share-kakao'], ['share-insta', 'share-insta'], ['share-save', 'share-save'], ['share-copy', 'share-copy'],
-  ['t-support-kakao', 'support-kakaopay'], ['t-support', 'support-bmc'], ['hub-link', 'hub-link'], ['lb', 'rank-link']]
+  ['t-support-kakao', 'support-kakaopay'], ['t-support-toss', 'support-toss'], ['t-support', 'support-bmc'], ['hub-link', 'hub-link'], ['lb', 'rank-link']]
   .forEach(([id, path]) => { const el = $(id); if (el) el.addEventListener('click', () => gcEvent(path)); });
-[['cheer-kakao', 'cheer-kakaopay'], ['cheer-bmc', 'cheer-bmc'], ['share-cheer-kakao', 'share-cheer-kakaopay'], ['share-cheer-bmc', 'share-cheer-bmc']]
+[['cheer-kakao', 'cheer-kakaopay'], ['cheer-bmc', 'cheer-bmc'], ['share-cheer-kakao', 'share-cheer-kakaopay'], ['share-cheer-bmc', 'share-cheer-bmc'],
+  ['cheer-toss', 'cheer-toss'], ['share-cheer-toss', 'share-cheer-toss']]
   .forEach(([id, path]) => $(id).addEventListener('click', () => gcEvent(path)));
+// Toss opens only as an app link on a phone; on a computer the account is copied instead
+if (CFG.supportToss) {
+  const phone = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform));
+  const q = new URLSearchParams(CFG.supportToss.split('?')[1] || ''), acct = `${q.get('bank') || ''} ${q.get('accountNo') || ''}`.trim();
+  ['t-support-toss', 'cheer-toss', 'share-cheer-toss'].forEach((id) => $(id).addEventListener('click', (e) => {
+    if (phone) return;
+    e.preventDefault();
+    const say = () => toast(`PC에서는 토스 앱을 열 수 없어요. 계좌번호를 복사했어요: ${acct}`);
+    try { navigator.clipboard.writeText(acct).then(say, () => toast(`토스 계좌: ${acct}`)); } catch (err) { toast(`토스 계좌: ${acct}`); }
+  }));
+}
 
 // ---- school leaderboard: points also go to the school's daily total (Supabase), the HUD shows today's national rank
 const LB = CFG.supabaseUrl && CFG.supabaseKey && CFG.code ? { url: CFG.supabaseUrl.replace(/\/+$/, ''), key: CFG.supabaseKey } : null;
