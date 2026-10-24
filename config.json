@@ -17,6 +17,7 @@
     "100주년기념관": "glass",
     "영신관": "brick"
   },
+  "supportKakao": "https://qr.kakaopay.com/FKcOJKyOy1f405462",
   "supportToss": "supertoss://send?amount=1000&bank=%ED%86%A0%EC%8A%A4%EB%B1%85%ED%81%AC&accountNo=100123297463&origin=qr",
   "hub": "https://hong-iron.github.io/SMASH/",
   "kakaoKey": "ff20552a5a51bc1fe0e0ecdecd217f35",
