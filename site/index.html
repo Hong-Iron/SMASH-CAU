@@ -403,7 +403,7 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
     </svg>
   </button>
 
-  <p class="credit"><span class="short">© </span><span class="long">건물·도로 © </span><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap 기여자</a><span class="long"> · 고도 AWS Terrain Tiles (SRTM 30 m 기반) · 건물 겉모습은 실제 사진이 아닌 일반 재질</span> · 학교와 관계없는 비공식 팬 게임</p>
+  <p class="credit"><span class="short">© </span><span class="long">건물·도로 © </span><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap 기여자</a><span class="long"> · 고도 AWS Terrain Tiles (SRTM 30 m 기반) · 건물 겉모습은 실제 사진이 아닌 일반 재질</span> · 학교와 관계없는 비공식 팬 게임 · <a id="x-link" href="https://x.com/Hong_Iron_DEV" target="_blank" rel="noopener">@Hong_Iron_DEV</a></p>
   <p id="toast" hidden></p>
   <div id="cheer" role="dialog" aria-label="개발자 응원" hidden>
     <div class="top"><b id="cheer-title"></b><button type="button" class="x" id="cheer-close" aria-label="닫기">&times;</button></div>
@@ -3336,7 +3336,7 @@ function gcEvent(path) {
   try { const g = window.goatcounter; if (g && g.count) g.count({ path, title: CFG.code || '', event: true }); } catch (e) { /* blocked by the browser */ }
 }
 [['share', 'share-open'], ['share-kakao', 'share-kakao'], ['share-insta', 'share-insta'], ['share-save', 'share-save'], ['share-copy', 'share-copy'],
-  ['t-support-kakao', 'support-kakaopay'], ['t-support-toss', 'support-toss'], ['t-support', 'support-bmc'], ['hub-link', 'hub-link'], ['lb', 'rank-link']]
+  ['t-support-kakao', 'support-kakaopay'], ['t-support-toss', 'support-toss'], ['t-support', 'support-bmc'], ['hub-link', 'hub-link'], ['x-link', 'x-link'], ['lb', 'rank-link']]
   .forEach(([id, path]) => { const el = $(id); if (el) el.addEventListener('click', () => gcEvent(path)); });
 [['cheer-kakao', 'cheer-kakaopay'], ['cheer-bmc', 'cheer-bmc'], ['share-cheer-kakao', 'share-cheer-kakaopay'], ['share-cheer-bmc', 'share-cheer-bmc'],
   ['cheer-toss', 'cheer-toss'], ['share-cheer-toss', 'share-cheer-toss']]
