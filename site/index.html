@@ -3356,7 +3356,9 @@ if (CFG.supportToss) {
 // ---- school leaderboard: points also go to the school's daily total (Supabase), the HUD shows today's national rank
 const LB = CFG.supabaseUrl && CFG.supabaseKey && CFG.code ? { url: CFG.supabaseUrl.replace(/\/+$/, ''), key: CFG.supabaseKey } : null;
 const lbPend = { score: 0, kills: 0 };
-let lbFirst = true, lbBusy = false, lbFails = 0, lbBoard = null, lbMine = 0, lbRank = 0;
+let lbFirst = true, lbBusy = false, lbFails = 0, lbBoard = null, lbMine = 0, lbRank = 0, lbFetchedAt = 0;
+// free-plan server limits: send points every 3 minutes (and when leaving), read the board every 5 minutes
+const LB_SEND_EVERY = 180000, LB_FETCH_EVERY = 300000, LB_TIMEOUT = 8000;
 const trim0 = (v, d) => v.toFixed(d).replace(/\.0$/, '');
 const fmtPts = (n) => (n >= 1e8 ? `${trim0(n / 1e8, n >= 1e9 ? 0 : 1)}억` : n >= 1e4 ? `${trim0(n / 1e4, n >= 1e5 ? 0 : 1)}만` : Math.round(n).toLocaleString('ko-KR'));
 const shortName = (n) => (n || '').replace('대학교', '대').replace(/ 캠퍼스$/, '');
@@ -3394,10 +3396,14 @@ function lbSend(leaving) {
   }).catch(() => { lbFails++; lbPend.score += sent.score; lbPend.kills += sent.kills; if (first) lbFirst = true; })
     .finally(() => { if (!leaving) lbBusy = false; });
 }
-async function lbFetch() {
+async function lbFetch(force) {
   if (!LB || document.visibilityState === 'hidden') return;
+  if (!force && Date.now() - lbFetchedAt < LB_FETCH_EVERY - 5000) return;   // coming back to the tab doesn't refetch every time
+  lbFetchedAt = Date.now();
   try {
-    const r = await fetch(`${LB.url}/rest/v1/rpc/smash_board`, { headers: lbHeaders(false) });
+    const ctl = window.AbortController ? new AbortController() : null;
+    if (ctl) setTimeout(() => ctl.abort(), LB_TIMEOUT);
+    const r = await fetch(`${LB.url}/rest/v1/rpc/smash_board`, { headers: lbHeaders(false), signal: ctl ? ctl.signal : undefined });
     if (!r.ok) throw new Error(r.status);
     const rows = await r.json();
     if (Array.isArray(rows)) { lbBoard = rows; lbMine = 0; showRank(); }
@@ -3425,9 +3431,9 @@ function showRank() {
 }
 if (LB) {
   $('lb').href = `${CFG.hub || ''}#rank`;
-  setTimeout(lbFetch, 1200);
-  setInterval(() => lbFlush(false), 30000);
-  setInterval(lbFetch, 60000);
+  setTimeout(() => lbFetch(true), 1200);
+  setInterval(() => lbFlush(false), LB_SEND_EVERY);
+  setInterval(() => lbFetch(true), LB_FETCH_EVERY);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') lbFlush(true); else lbFetch(); });
   addEventListener('pagehide', () => lbFlush(true));
 }
