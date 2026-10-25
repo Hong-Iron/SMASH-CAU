@@ -33,7 +33,7 @@
 
 ## 학교 랭킹과 방문 통계
 
-- 게임에서 얻은 점수는 30초마다 학교 점수로 모이고, 화면 오른쪽 위 점수 아래에 우리 학교의 오늘 전국 순위와 바로 윗 순위까지 남은 점수가 나옵니다. 전체 순위는 [SMASH 대학교](https://hong-iron.github.io/SMASH/#rank)에서 볼 수 있습니다. 오늘 순위는 매일 자정(한국 시간)에 새로 시작합니다.
+- 게임에서 얻은 점수는 3분마다(페이지를 떠날 때는 바로) 학교 점수로 모이고, 화면 오른쪽 위 점수 아래에 우리 학교의 오늘 전국 순위와 바로 윗 순위까지 남은 점수가 나옵니다. 전체 순위는 [SMASH 대학교](https://hong-iron.github.io/SMASH/#rank)에서 볼 수 있습니다. 오늘 순위는 매일 자정(한국 시간)에 새로 시작합니다.
 - 랭킹 서버(Supabase)에는 학교 코드, 점수, 무너뜨린 건물 수만 보냅니다. 이름이나 기기 정보는 보내지 않습니다. 너무 자주 보내는 것을 막으려고 IP 주소를 날짜와 섞은 해시로 바꿔 2분 동안만 둡니다.
 - 방문 수는 쿠키를 쓰지 않는 [GoatCounter](https://www.goatcounter.com/)로 셉니다. 공유·응원·다른 학교 버튼을 누른 횟수도 함께 셉니다.
 
@@ -48,21 +48,27 @@
 
 - 건물 모양과 층수, 도로, 녹지: © OpenStreetMap 기여자 (ODbL). `data/campus.json`도 ODbL을 따릅니다.
 - 땅 높이: AWS Terrain Tiles (Mapzen terrarium 형식, SRTM 30 m 기반).
-- 100주년기념관 층수(지상 12층, 지하 6층): 대학저널 2016년 준공 보도.
-- OpenStreetMap에 층수가 없는 건물 6동은 4층으로 어림했습니다.
-- 건물 겉모습(창문, 벽돌, 유리)은 실제 사진이 아니라 코드로 그린 일반 재질입니다.
+- 층수와 높이: 국토교통부 건축물대장(공공데이터포털 건축HUB, 서울 동작구 흑석동 221)에서 이름이 맞는 11동을 가져왔습니다. 블루미르홀 두 동은 대장의 '학생기숙사'(15층)와 '학생기숙사 2차'(12층)를 방 수와 건물 크기로 짝지은 추정입니다.
+- 100주년기념관 층수(지상 12층, 지하 6층): 대학저널 2016년 준공 보도. 나머지는 OpenStreetMap 층수이거나, 없으면 4층으로 어림했습니다.
+- 건물 색: 중앙대학교 캠퍼스맵 건물 사진과 위키미디어 공용 사진을 보고 벽·지붕·유리·창틀 색만 골랐습니다. 사진 자체는 쓰지 않습니다. 창문, 벽돌, 유리 무늬는 코드로 그린 일반 재질입니다.
 
 ## 만든 방법
 
-- 같은 방식으로 만든 다른 학교: [SMASH SSU](https://github.com/Hong-Iron/SMASH-SSU), [SMASH SNU](https://github.com/Hong-Iron/SMASH-SNU)
+- 같은 방식으로 만든 다른 학교는 [SMASH 대학교](https://hong-iron.github.io/SMASH/)에서 볼 수 있습니다.
 - 3D는 three.js r160(CDN), 소리는 Web Audio로 합성합니다. 소리 파일은 없습니다.
-- 학교 이름, 주소, 미리보기 문구, 건물별 재질 지정은 `config.json`에 있습니다.
+- 학교 이름, 주소, 미리보기 문구는 `config.json`에 있습니다. 사진을 보고 고른 건물별 색(`look`: 벽·지붕·유리·창틀 색, 창 간격, 경사 지붕 여부)과 건축물대장 조회용 지번(`parcels`)도 `config.json`에 넣을 수 있습니다.
 - 랭킹 서버 주소와 공개 키(`supabaseUrl`, `supabaseKey`), 방문 통계 주소(`goatcounter`)도 `config.json`에 있습니다. 랭킹 서버의 표와 함수는 [SMASH 저장소의 `supabase/`](https://github.com/Hong-Iron/SMASH/tree/main/supabase)에 있습니다.
 - 페이지 만들기: `src/app.html` + `data/campus.json` + `config.json` → `python3 tools/assemble.py` → `site/index.html`
+- 건물 겉모습은 코드가 OpenStreetMap 윤곽과 이름으로 자동으로 꾸밉니다. 평지붕은 회색·흰색 위주에 초록 방수 도장이 다섯에 하나꼴로 섞이고, 경사 지붕은 사진으로 확인해 `config.json`의 `look`에 `hip: true`로 적은 건물에만 얹습니다. 1층은 화강석 기둥과 유리이고, 가장 가까운 도로 쪽 벽에 유리문과 차양이 붙습니다. 창은 벽 안으로 들어가 보이도록 그늘과 굴곡을 넣습니다. 기숙사·연구동·도서관은 이름을 보고 창 모양을 고릅니다.
+- 바닥은 도로와 건물 둘레만 포장하고 나머지 빈 땅은 잔디로 칠합니다. 학교 밖 땅은 학교와 건물 둘레 26 m까지만 남깁니다.
+- PC에서는 구석 음영(N8AO, CDN)을 켭니다. N8AO가 불러오는 postprocessing 라이브러리는 쓰지 않아서 `site/pp-stub.js` 한 줄로 대신합니다. 주소 끝에 `?ao=0`/`?ao=1`을 붙이면 끄고 켜고, `?fps`를 붙이면 화면 위에 프레임 수가 나옵니다.
+- 화면이 멈춰 있으면 1초에 한 번만 다시 그리고, 그림자는 건물이나 조각이 움직일 때만 다시 계산합니다.
+- 미리보기 그림: `site/og.png`(1200×630, 공유 미리보기)를 새로 찍으면 `tools/make_card.py`로 `site/card.webp`(SMASH 대학교 카드용, 600×315)도 다시 만듭니다.
 - 데이터 다시 만들기 (numpy, matplotlib 필요):
   1. `python3 tools/fetch.py way 284355223 raw`
   2. `python3 tools/build_campus.py raw raw/campus_raw.json`
   3. `python3 tools/add_trees.py raw/campus_raw.json data/campus.json`
   4. `python3 tools/fix_terrain.py data/campus.json` — 땅 높이 정리: 높이 자료의 빈칸(음수 값)을 메우고, 높은 건물이 언덕처럼 찍힌 자국을 지우고, 호수와 연못을 평평한 수면으로 맞춥니다.
+  5. (선택) `python3 tools/floors.py` — 국토교통부 건축물대장(공공데이터포털 건축HUB 건축물대장정보 서비스)에서 층수와 높이를 받아 이름이 맞는 건물에 넣습니다. `config.json`의 `parcels`(시군구 코드, 법정동 코드, 번, 지)가 있어야 합니다. 키는 저장소 맨 위 `.env`에 `DATA_GO_KR_KEY=...`로 넣고, `.env`와 받은 `data/floors.json`은 git에 올리지 않습니다. 이름으로 못 맞춘 건물은 `config.json`의 `floorsManual`에 직접 적습니다.
   - 100주년기념관 층수(지상 12층)는 OpenStreetMap에 없어서 지금 `data/campus.json`에만 들어 있습니다. 데이터를 다시 만들면 직접 넣어야 합니다.
 - `main`에 push하면 GitHub Actions가 `site/` 폴더를 GitHub Pages에 올립니다.

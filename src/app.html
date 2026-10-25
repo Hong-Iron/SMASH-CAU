@@ -868,8 +868,8 @@ const STYLE = {
   dorm:     { wall: '#dccdb2', glass: '#2c343c', roof: '#8a857c', frame: '#f1ece2', bay: 2.4, winW: 0.46, winH: 0.46, sill: 0.32, brick: 0, gr: 0.14 },
 };
 const NODOOR = -1e5;
-// Korean flat roofs are mostly painted with green urethane waterproofing; pitched roofs get slate, copper or clay
-const ROOF_FLAT = ['#6b977a', '#679277', '#8e8c86', '#719c80', '#8a8780'];
+// flat roofs seen from the air are mostly grey or pale concrete; about one in five carries green urethane waterproofing
+const ROOF_FLAT = ['#8e8c86', '#a3a19a', '#7f7d77', '#b4b2ab', '#6b977a', '#96948d', '#8a8780', '#adaba4', '#719c80', '#9b9993'];
 const ROOF_HIP = { brick: ['#4c535c', '#8c5240'], stone: ['#5a8676', '#4c535c'], tan: ['#8c5240', '#5a8676'] };
 function patchBuilding(sh) {
   Object.assign(sh.uniforms, this.userData.u, QU, NIGHT);
@@ -1053,7 +1053,8 @@ function makeMaterial(b) {
   const st = { ...STYLE[b.style] };
   for (const k of ['wall', 'glass', 'frame', 'bay', 'winW', 'winH', 'sill', 'brick']) if (lk[k] !== undefined) st[k] = lk[k];
   const h = hashStr(b.id + 'roof');
-  const roof = lk.roof || (b.hip ? (ROOF_HIP[b.style] || ROOF_HIP.stone)[h % 2] : ROOF_FLAT[h % ROOF_FLAT.length]);
+  // roof colour: a photo-checked look first, then the colour measured on aerial imagery (data rc), then a stable guess
+  const roof = lk.roof || b.rc || (b.hip ? (ROOF_HIP[b.style] || ROOF_HIP.stone)[h % 2] : ROOF_FLAT[h % ROOF_FLAT.length]);
   const m = new THREE.MeshStandardMaterial({ roughness: 0.88, metalness: 0, envMapIntensity: 0.7 });
   m.userData.u = {
     uWall: { value: new THREE.Color(st.wall) }, uGlass: { value: new THREE.Color(st.glass) }, uRoof: { value: new THREE.Color(roof) },
@@ -1237,10 +1238,9 @@ function insetRing(r, d) {
 function planHip(nb) {
   const floors = nb.lv || Math.round(nb.h / nb.fh), lk = lookOf(nb) || {};
   if (nb.ho.length || lk.hip === false) return null;
-  if (lk.hip !== true) {
-    if (floors > 4 || nb.h > 18 || !ROOF_HIP[nb.style]) return null;
-    if (nb.style === 'tan' && hashStr(nb.id + 'hip') % 2) return null;
-  }
+  // a pitched roof only where a photo showed one: guessing from the random facade style put clay roofs on flat-roofed campuses
+  if (lk.hip !== true) return null;
+  if (!ROOF_HIP[nb.style] && !lk.roof) return null;
   const c = Math.cos(nb.theta), s = Math.sin(nb.theta);
   let u0 = Infinity, u1 = -Infinity, w0 = Infinity, w1 = -Infinity;
   for (const p of nb.solid) { const u = p.x * c + p.z * s, w = -p.x * s + p.z * c; u0 = Math.min(u0, u); u1 = Math.max(u1, u); w0 = Math.min(w0, w); w1 = Math.max(w1, w); }
