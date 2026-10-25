@@ -807,18 +807,24 @@ const STYLE = {
   glass:    { wall: '#a9b2ba', glass: '#3a5266', roof: '#8a8d90', frame: '#2b3036', bay: 1.6, winW: 0.9,  winH: 0.84, sill: 0.08, brick: 0, gr: 0.05 },
   concrete: { wall: '#bab8b0', glass: '#2b353f', roof: '#8e8c86', frame: '#8f9396', bay: 4.0, winW: 0.94, winH: 0.42, sill: 0.36, brick: 0, gr: 0.12 },
   tan:      { wall: '#c7b394', glass: '#2e3740', roof: '#8a857c', frame: '#ece6d8', bay: 3.2, winW: 0.56, winH: 0.5,  sill: 0.3,  brick: 0, gr: 0.14 },
+  ribbon:   { wall: '#c9c8c2', glass: '#2d3b47', roof: '#8e8c86', frame: '#5d646b', bay: 1.5, winW: 0.97, winH: 0.4,  sill: 0.34, brick: 0, gr: 0.08 },
+  dorm:     { wall: '#dccdb2', glass: '#2c343c', roof: '#8a857c', frame: '#f1ece2', bay: 2.4, winW: 0.46, winH: 0.46, sill: 0.32, brick: 0, gr: 0.14 },
 };
+const NODOOR = -1e5;
+// Korean flat roofs are mostly painted with green urethane waterproofing; pitched roofs get slate, copper or clay
+const ROOF_FLAT = ['#6b977a', '#679277', '#8e8c86', '#719c80', '#8a8780'];
+const ROOF_HIP = { brick: ['#4c535c', '#8c5240'], stone: ['#5a8676', '#4c535c'], tan: ['#8c5240', '#5a8676'] };
 function patchBuilding(sh) {
   Object.assign(sh.uniforms, this.userData.u, QU, NIGHT);
   sh.vertexShader = sh.vertexShader
-    .replace('#include <common>', '#include <common>\nattribute vec2 fuv;\nattribute float fkind;\nvarying vec2 vFuv;\nvarying float vKind;\nuniform float uGround;\n' + QUAKE_VS)
+    .replace('#include <common>', '#include <common>\nattribute vec2 fuv;\nattribute float fkind;\nattribute vec2 fdoor;\nvarying vec2 vFuv;\nvarying float vKind;\nvarying vec2 vDoor;\nuniform float uGround;\n' + QUAKE_VS)
     .replace('#include <project_vertex>', quakeProject('max(0.0, qwp.y - uGround)'))
-    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFuv = fuv; vKind = fkind;');
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFuv = fuv; vKind = fkind; vDoor = fdoor;');
   sh.fragmentShader = sh.fragmentShader
     .replace('#include <common>', `#include <common>
 uniform vec3 uWall; uniform vec3 uGlass; uniform vec3 uRoof; uniform vec3 uFrame;
 uniform float uBay; uniform float uFloor; uniform float uWinW; uniform float uWinH; uniform float uSill; uniform float uBrick; uniform float uSeed; uniform float uGlassRough; uniform float uTop; uniform float uLo; uniform float uNight;
-varying vec2 vFuv; varying float vKind;
+varying vec2 vFuv; varying float vKind; varying vec2 vDoor;
 ${NOISE}
 float band(float x, float a, float b, float w) { return clamp(smoothstep(a - w, a + w, x) - smoothstep(b - w, b + w, x), 0.0, 1.0); }`)
     .replace('#include <color_fragment>', `#include <color_fragment>
@@ -877,6 +883,41 @@ vec3 gLitCol = vec3(1.0, 0.76, 0.42);
     float lit = step(0.5, h21(cell * 2.37 + uSeed * 3.1)) * step(uLo + 1.0, vFuv.y);
     gLitCol = mix(vec3(1.0, 0.74, 0.4), vec3(0.82, 0.9, 1.0), step(0.62, h21(cell * 0.71 + uSeed * 1.3)));
     gLit = mix(win * (1.0 - bars) * lit, cover * 0.3, far);
+    // ground floor: granite piers, shop-front glass and a fascia band under the first slab
+    {
+      float gz = 1.0 - step(uFloor, vFuv.y);
+      float px = vFuv.x / 4.8, pf = fract(px);
+      float pier = 1.0 - band(pf, 0.12, 0.96, fwidth(px));
+      float qx = vFuv.x / 1.6;
+      float pane = band(fract(qx), 0.04, 0.96, fwidth(qx));
+      float gy0 = max(uLo + 0.6, 0.0) + 0.12;
+      float shop = band(vFuv.y, gy0, uFloor - 0.8, fwy) * (1.0 - pier);
+      float fascia = band(vFuv.y, uFloor - 0.8, uFloor - 0.04, fwy);
+      vec3 granite = mix(vec3(0.37, 0.36, 0.35), uWall, 0.3) * (0.88 + 0.22 * fbm(vFuv * vec2(0.6, 1.4) + uSeed));
+      vec3 sg = uGlass * (0.75 + 0.3 * h21(floor(vec2(qx, 0.0)) + uSeed)) + 0.03;
+      vec3 g0 = mix(granite, sg, shop * pane);
+      g0 = mix(g0, uFrame * 0.55, shop * (1.0 - pane));
+      g0 = mix(g0, mix(uFrame, uWall, 0.55), fascia);
+      col = mix(col, mix(g0, mix(granite, sg, 0.55), far * 0.8), gz);
+      gGlass = mix(gGlass, mix(shop * pane, 0.5, far), gz);
+      gLit = mix(gLit, mix(shop * pane, 0.4, far) * 0.8, gz);
+      gLitCol = mix(gLitCol, vec3(1.0, 0.82, 0.55), gz);
+    }
+    // main entrance (the face that looks at the nearest road): a framed double glass door
+    {
+      float du = abs(vFuv.x - vDoor.x), dy = vFuv.y - vDoor.y;
+      float surround = (1.0 - step(2.7, du)) * step(-0.25, dy) * (1.0 - step(3.15, dy));
+      float leaf = (1.0 - step(2.35, du)) * step(0.0, dy) * (1.0 - step(2.85, dy));
+      float split = 1.0 - smoothstep(0.04, 0.08 + fwidth(du), du);
+      float side = band(du, 1.15, 1.22, fwidth(du));
+      float bar = band(dy, 1.0, 1.07, fwy);
+      col = mix(col, uFrame * 0.45, surround);
+      col = mix(col, uGlass * 0.55 + 0.05, leaf);
+      col = mix(col, uFrame * 0.5, leaf * clamp(split + side + bar, 0.0, 1.0));
+      gGlass = mix(gGlass, 1.0, leaf);
+      gLit = mix(gLit, 1.0, leaf);
+      gLitCol = mix(gLitCol, vec3(1.0, 0.85, 0.6), leaf);
+    }
   } else if (vKind < 1.5) {
     vec3 roof = uRoof * (0.78 + 0.32 * fbm(vFuv * 0.22 + uSeed));
     vec2 g3 = fract(rg3);
@@ -891,10 +932,18 @@ vec3 gLitCol = vec3(1.0, 0.76, 0.42);
     col = conc;
   } else if (vKind < 3.5) {
     col = mix(uWall, uFrame, 0.35) * (0.86 + 0.24 * fbm(vFuv * 0.5 + uSeed));
-  } else {
+  } else if (vKind < 4.5) {
     vec3 m = vec3(0.56, 0.58, 0.58) * (0.85 + 0.22 * fbm(vFuv * 0.8 + uSeed));
     m *= 1.0 - 0.14 * band(fract(rib), 0.0, 0.3, ribw) * (1.0 - smoothstep(0.3, 0.8, ribw));
     col = m;
+  } else {
+    // pitched roof tiles: courses along the slope, joints staggered row by row
+    vec3 t = uRoof * (0.8 + 0.32 * fbm(vFuv * vec2(0.3, 0.6) + uSeed));
+    float row = vFuv.y / 0.42, rw2 = fwidth(row), fade = 1.0 - smoothstep(0.3, 0.8, rw2);
+    t *= 1.0 - 0.3 * (1.0 - smoothstep(0.0, 0.2 + rw2, fract(row))) * fade;
+    float jx = vFuv.x / 0.9 + 0.5 * mod(floor(row), 2.0);
+    t *= 1.0 - 0.14 * (1.0 - smoothstep(0.0, 0.06 + fwidth(jx), fract(jx))) * fade;
+    col = t;
   }
   diffuseColor.rgb = col;
 }`)
@@ -903,16 +952,32 @@ vec3 gLitCol = vec3(1.0, 0.76, 0.42);
     .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += uNight * gLitCol * gLit * 1.5;');
 }
 function hashStr(s) { let h = 2166136261; for (const ch of s) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+// the building's name and OSM kind pick a facade first; the rest stay a stable random mix
+const STYLE_BY_NAME = [
+  [/기숙사|생활관|하우스|학사|숙사|dorm|residence|hall of residence/i, 'dorm'],
+  [/공학|과학|연구|R&D|센터|정보|테크|tech/i, 'ribbon'],
+  [/도서관|library/i, 'glass'],
+];
+// config "look": per-building colours checked against photos, keyed by OSM id or name
+function lookOf(b) { const L = CFG.look || {}; return L[b.id] || (b.n && L[b.n]) || null; }
 function styleOf(b) {
+  const lk = lookOf(b);
+  if (lk && lk.style) return lk.style;
   if (CFG.styles && CFG.styles[b.n]) return CFG.styles[b.n];
+  if (b.kind === 'dormitory') return 'dorm';
+  for (const [re, s] of STYLE_BY_NAME) if (b.n && re.test(b.n)) return s;
   const h = hashStr(b.id);
-  return ['stone', 'brick', 'concrete', 'glass', 'tan', 'stone'][h % 6];
+  return ['stone', 'brick', 'concrete', 'glass', 'tan', 'stone', 'ribbon'][h % 7];
 }
 function makeMaterial(b) {
-  const st = STYLE[styleOf(b)];
+  const lk = lookOf(b) || {};
+  const st = { ...STYLE[b.style] };
+  for (const k of ['wall', 'glass', 'frame', 'bay', 'winW', 'winH', 'sill', 'brick']) if (lk[k] !== undefined) st[k] = lk[k];
+  const h = hashStr(b.id + 'roof');
+  const roof = lk.roof || (b.hip ? (ROOF_HIP[b.style] || ROOF_HIP.stone)[h % 2] : ROOF_FLAT[h % ROOF_FLAT.length]);
   const m = new THREE.MeshStandardMaterial({ roughness: 0.88, metalness: 0, envMapIntensity: 0.7 });
   m.userData.u = {
-    uWall: { value: new THREE.Color(st.wall) }, uGlass: { value: new THREE.Color(st.glass) }, uRoof: { value: new THREE.Color(st.roof) },
+    uWall: { value: new THREE.Color(st.wall) }, uGlass: { value: new THREE.Color(st.glass) }, uRoof: { value: new THREE.Color(roof) },
     uFrame: { value: new THREE.Color(st.frame) }, uTop: { value: b.h }, uLo: { value: b.lo - b.g }, uGround: { value: b.g },
     uBay: { value: st.bay }, uFloor: { value: b.fh }, uWinW: { value: st.winW }, uWinH: { value: st.winH }, uSill: { value: st.sill },
     uBrick: { value: st.brick }, uSeed: { value: (hashStr(b.id) % 1000) / 37 }, uGlassRough: { value: st.gr },
@@ -973,36 +1038,71 @@ function makeDef(poly, y0, y1, top, base, meta) {
     y0: y0 - cy, y1: y1 - cy, top, cc: new THREE.Vector3(cx, cy, cz),
     ox: base.ox + cx, oy: base.oy + cy, oz: base.oz + cz,
     hx, hy, hz, rest: (hs[0] + hs[1]) / 2, size: 2 * hs[2],
-    bi: meta.bi, cell: meta.cell, level: meta.level, gy: meta.gy, mech: !!meta.mech, geo: null,
+    bi: meta.bi, cell: meta.cell, level: meta.level, gy: meta.gy, mech: !!meta.mech, skin: meta.skin || 0, deco: !!meta.deco, geo: null,
   };
 }
 function getGeo(def) {
   if (def.geo) return def.geo;
   const { poly, y0, y1, ox, oy, oz, gy } = def;
-  const pos = [], nor = [], uv = [], kd = [];
-  const push = (x, y, z, nx, ny, nz, u, v, k) => { pos.push(x, y, z); nor.push(nx, ny, nz); uv.push(u, v); kd.push(k); };
-  const n = poly.length;
+  const pos = [], nor = [], uv = [], kd = [], dr = [];
+  let du = NODOOR, dv = 0;
+  const push = (x, y, z, nx, ny, nz, u, v, k) => { pos.push(x, y, z); nor.push(nx, ny, nz); uv.push(u, v); kd.push(k); dr.push(du, dv); };
+  const n = poly.length, door = B[def.bi].door;
   for (let i = 0; i < n; i++) {
     const a = poly[i], b = poly[(i + 1) % n];
     const dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz);
-    if (len < 1e-4 || a.f === 2) continue;
-    const ux = dx / len, uz = dz / len, nx = uz, nz = -ux, k = a.f === 1 ? (def.mech ? 4 : 0) : 2;
+    if (len < 1e-4 || a.f === 2 || def.hip) continue;
+    const ux = dx / len, uz = dz / len, nx = uz, nz = -ux, k = a.f === 1 ? (def.skin || (def.mech ? 4 : 0)) : 2;
     const ua = (a.x + ox) * ux + (a.z + oz) * uz, ub = ua + len, va = y0 + oy - gy, vb = y1 + oy - gy;
+    // the door is painted on whichever wall pieces lie on the entrance wall's line
+    du = NODOOR;
+    if (k === 0 && door && Math.abs((a.x + ox - door.x) * door.nx + (a.z + oz - door.z) * door.nz) < 0.25 && Math.abs(nx * door.nx + nz * door.nz) > 0.999) {
+      du = door.x * ux + door.z * uz; dv = door.y - gy;
+    }
     push(a.x, y0, a.z, nx, 0, nz, ua, va, k); push(a.x, y1, a.z, nx, 0, nz, ua, vb, k); push(b.x, y0, b.z, nx, 0, nz, ub, va, k);
     push(b.x, y0, b.z, nx, 0, nz, ub, va, k); push(a.x, y1, a.z, nx, 0, nz, ua, vb, k); push(b.x, y1, b.z, nx, 0, nz, ub, vb, k);
   }
+  du = NODOOR;
   let tris = [];
   try { tris = THREE.ShapeUtils.triangulateShape(poly.map((p) => new THREE.Vector2(p.x, p.z)), []); } catch (e) { tris = []; }
-  const kt = def.top ? (def.mech ? 4 : 1) : 2;
+  const kt = def.top ? (def.skin || (def.mech ? 4 : 1)) : 2;
+  const hip = def.hip, yTop = hip ? y0 : y1;
   for (const [i, j, l] of tris) {
     const A = poly[i], B = poly[j], C = poly[l];
     if (!A || !B || !C) continue;
     const cy = (B.z - A.z) * (C.x - A.x) - (B.x - A.x) * (C.z - A.z);
     const up = cy > 0 ? [A, B, C] : [A, C, B];
-    for (const p of up) push(p.x, y1, p.z, 0, 1, 0, p.x + ox, p.z + oz, kt);
+    if (!hip) for (const p of up) push(p.x, y1, p.z, 0, 1, 0, p.x + ox, p.z + oz, kt);
     for (const p of [up[0], up[2], up[1]]) push(p.x, y0, p.z, 0, -1, 0, p.x + ox, p.z + oz, 2);
   }
-  if (def.top && !def.mech) {
+  if (hip) {
+    // hip roof: a sloped strip from every eave up to the inset ridge outline, closed by a low flat top
+    for (let i = 0; i < n; i++) {
+      const a = poly[i], b = poly[(i + 1) % n], ai = hip[i], bi_ = hip[(i + 1) % n];
+      const ex = b.x - a.x, ez = b.z - a.z, len = Math.hypot(ex, ez);
+      if (len < 1e-4) continue;
+      const ux = ex / len, uz = ez / len;
+      const run = def.hipRun, rise = y1 - y0, sl = Math.hypot(run, rise);
+      const nx = uz * rise / sl, ny = run / sl, nz = -ux * rise / sl;
+      const uOf = (p) => (p.x + ox) * ux + (p.z + oz) * uz;
+      const P = [[a, y0, 0], [b, y0, 0], [bi_, y1, sl], [ai, y1, sl]];
+      for (const [i0, i1, i2] of [[0, 1, 2], [0, 2, 3]]) {
+        let t = [P[i0], P[i1], P[i2]];
+        const e1 = [t[1][0].x - t[0][0].x, t[1][1] - t[0][1], t[1][0].z - t[0][0].z], e2 = [t[2][0].x - t[0][0].x, t[2][1] - t[0][1], t[2][0].z - t[0][0].z];
+        const cx_ = e1[1] * e2[2] - e1[2] * e2[1], cy_ = e1[2] * e2[0] - e1[0] * e2[2], cz_ = e1[0] * e2[1] - e1[1] * e2[0];
+        if (cx_ * nx + cy_ * ny + cz_ * nz < 0) t = [t[0], t[2], t[1]];
+        for (const [q, y, v] of t) push(q.x, y, q.z, nx, ny, nz, uOf(q), v, 5);
+      }
+    }
+    let rt = [];
+    try { rt = THREE.ShapeUtils.triangulateShape(hip.map((p) => new THREE.Vector2(p.x, p.z)), []); } catch (e) { rt = []; }
+    for (const [i, j, l] of rt) {
+      const A = hip[i], B = hip[j], C = hip[l];
+      const cy = (B.z - A.z) * (C.x - A.x) - (B.x - A.x) * (C.z - A.z);
+      for (const p of cy > 0 ? [A, B, C] : [A, C, B]) push(p.x, y1, p.z, 0, 1, 0, p.x + ox, p.z + oz, 5);
+    }
+  }
+  if (def.top && !def.mech && !B[def.bi].hip) {
     const PH = 1.0, PT = 0.35, yT = y1 + PH;
     const upTri = (P, Q, R, y) => {
       const cy = (Q.z - P.z) * (R.x - P.x) - (Q.x - P.x) * (R.z - P.z);
@@ -1028,9 +1128,79 @@ function getGeo(def) {
   g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
   g.setAttribute('fuv', new THREE.Float32BufferAttribute(uv, 2));
   g.setAttribute('fkind', new THREE.Float32BufferAttribute(kd, 1));
+  g.setAttribute('fdoor', new THREE.Float32BufferAttribute(dr, 2));
   g.computeBoundingSphere();
   def.geo = g;
   return g;
+}
+
+// ============ automatic detail: hip roofs on low old-style buildings, a main entrance toward the nearest road
+// inset a counter-clockwise ring by d metres; null when the result folds over itself
+function insetRing(r, d) {
+  const n = r.length, out = [];
+  for (let i = 0; i < n; i++) {
+    const p = r[(i + n - 1) % n], v = r[i], q = r[(i + 1) % n];
+    const l1 = Math.hypot(v.x - p.x, v.z - p.z), l2 = Math.hypot(q.x - v.x, q.z - v.z);
+    if (l1 < 1e-3 || l2 < 1e-3) return null;
+    const n1x = (v.z - p.z) / l1, n1z = -(v.x - p.x) / l1, n2x = (q.z - v.z) / l2, n2z = -(q.x - v.x) / l2;
+    const k = 1 + n1x * n2x + n1z * n2z;
+    if (k < 0.35) return null;   // spikes would shoot the miter far away
+    out.push({ x: v.x - d * (n1x + n2x) / k, z: v.z - d * (n1z + n2z) / k, f: 1 });
+  }
+  const ring = r.map((p) => [p.x, p.z]);
+  for (let i = 0; i < n; i++) {
+    const a = r[i], b = r[(i + 1) % n], A = out[i], Bq = out[(i + 1) % n];
+    if ((b.x - a.x) * (Bq.x - A.x) + (b.z - a.z) * (Bq.z - A.z) <= 0) return null;
+    if (!inRing(A.x, A.z, ring)) return null;
+  }
+  return area2(out) > 0.08 * area2(r) ? out : null;
+}
+function planHip(nb) {
+  const floors = nb.lv || Math.round(nb.h / nb.fh), lk = lookOf(nb) || {};
+  if (nb.ho.length || lk.hip === false) return null;
+  if (lk.hip !== true) {
+    if (floors > 4 || nb.h > 18 || !ROOF_HIP[nb.style]) return null;
+    if (nb.style === 'tan' && hashStr(nb.id + 'hip') % 2) return null;
+  }
+  const c = Math.cos(nb.theta), s = Math.sin(nb.theta);
+  let u0 = Infinity, u1 = -Infinity, w0 = Infinity, w1 = -Infinity;
+  for (const p of nb.solid) { const u = p.x * c + p.z * s, w = -p.x * s + p.z * c; u0 = Math.min(u0, u); u1 = Math.max(u1, u); w0 = Math.min(w0, w); w1 = Math.max(w1, w); }
+  let d = Math.min(6, Math.max(1.5, 0.28 * Math.min(u1 - u0, w1 - w0)));
+  for (let t = 0; t < 3; t++, d *= 0.6) {
+    const ring = insetRing(nb.solid, d);
+    if (ring) return { ring, run: d, rise: d * 0.72 };
+  }
+  return null;
+}
+function planDoor(nb) {
+  if (nb.h < 4.5 || Math.abs(area2(nb.solid)) < 150) return null;
+  const segs = [];
+  for (const r of D.roads) for (let i = 1; i < r.p.length; i++) segs.push([r.p[i - 1], r.p[i]]);
+  let best = null;
+  const n = nb.solid.length;
+  for (let i = 0; i < n; i++) {
+    const a = nb.solid[i], b = nb.solid[(i + 1) % n];
+    if (a.f !== 1) continue;
+    const len = Math.hypot(b.x - a.x, b.z - a.z);
+    if (len < 8) continue;
+    const ux = (b.x - a.x) / len, uz = (b.z - a.z) / len, nx = uz, nz = -ux;
+    for (const [p, q] of segs) {
+      // the road point nearest the wall's middle, only if it lies in front of the wall
+      const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+      const dx = q[0] - p[0], dz = q[1] - p[1], L = dx * dx + dz * dz;
+      const t = L ? Math.max(0, Math.min(1, ((mx - p[0]) * dx + (mz - p[1]) * dz) / L)) : 0;
+      const rx = p[0] + t * dx, rz = p[1] + t * dz, front = (rx - mx) * nx + (rz - mz) * nz;
+      if (front < 1) continue;
+      const dist = Math.hypot(rx - mx, rz - mz);
+      if (dist > 60 || (best && dist >= best.dist)) continue;
+      const along = Math.max(3.2, Math.min(len - 3.2, (rx - a.x) * ux + (rz - a.z) * uz));
+      best = { dist, x: a.x + ux * along, z: a.z + uz * along, ux, uz, nx, nz };
+    }
+  }
+  if (!best) return null;
+  best.y = Math.max(nb.lo, groundY(best.x + best.nx * 1.5, best.z + best.nz * 1.5));
+  if (best.y > nb.g + nb.h - 4) return null;
+  return best;
 }
 
 // ============ buildings and pieces
@@ -1045,6 +1215,9 @@ const B = D.buildings.map((b, bi) => {
     const a = b.o[i], c = b.o[(i + 1) % b.o.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]);
     if (L > bestL) { bestL = L; nb.theta = Math.atan2(c[1] - a[1], c[0] - a[0]); }
   }
+  nb.style = styleOf(nb);
+  nb.hip = planHip(nb);
+  nb.door = planDoor(nb);
   nb.mat = makeMaterial(nb);
   return nb;
 });
@@ -1071,6 +1244,27 @@ function addRoofUnits(b) {
     placed.push([x, z, rad]);
   }
 }
+function addStatic(b, poly, y0, y1, meta) {
+  if (area2(poly) < 0) poly = reverseRing(poly);
+  const def = makeDef(poly, y0, y1, 1, { ox: 0, oy: 0, oz: 0 }, { bi: b.bi, cell: -1, level: -1, gy: b.g, mech: true, ...meta });
+  const p = newPiece(def, new THREE.Vector3(def.ox, def.oy, def.oz), IDQ, true);
+  b.statics.add(p); world.add(p);
+  return def;
+}
+function addHipRoof(b) {
+  const top = b.g + b.h;
+  const def = addStatic(b, b.solid.map((p) => ({ ...p })), top, top + b.hip.rise, { skin: 5, deco: true });
+  def.hip = b.hip.ring.map((p) => ({ x: p.x - def.cc.x, z: p.z - def.cc.z }));
+  def.hipRun = b.hip.run;
+}
+function addCanopy(b) {
+  const d = b.door, W = Math.min(7.5, 0.6 * Math.hypot(b.x1 - b.x0, b.z1 - b.z0)), dep = 2.6, y0 = d.y + 3.25;
+  const at = (s, t) => ({ x: d.x + d.ux * s + d.nx * t, z: d.z + d.uz * s + d.nz * t, f: 1 });
+  addStatic(b, [at(-W / 2, 0.05), at(W / 2, 0.05), at(W / 2, dep), at(-W / 2, dep)], y0, y0 + 0.3, { deco: true }).canopy = true;
+  for (const s of [-W / 2 + 0.35, W / 2 - 0.35]) {
+    addStatic(b, [at(s - 0.14, dep - 0.55), at(s + 0.14, dep - 0.55), at(s + 0.14, dep - 0.27), at(s - 0.14, dep - 0.27)], d.y - 0.3, y0, { deco: true }).canopy = true;
+  }
+}
 const world = new Set(), dyn = new Set();
 function newPiece(def, pos, quat, isStatic) {
   return { def, pos: pos.clone(), quat: quat.clone(), vel: new THREE.Vector3(), ang: new THREE.Vector3(), static: isStatic, sleep: false, still: 0, mesh: null, born: 0 };
@@ -1080,7 +1274,8 @@ for (const b of B) {
   const def = makeDef(b.solid, b.lo - 2, b.g + b.h, 1, { ox: 0, oy: 0, oz: 0 }, { bi: b.bi, cell: -1, level: -1, gy: b.g });
   const p = newPiece(def, new THREE.Vector3(def.ox, def.oy, def.oz), IDQ, true);
   b.whole = p; b.statics.add(p); world.add(p);
-  addRoofUnits(b);
+  if (b.hip) addHipRoof(b); else addRoofUnits(b);
+  if (b.door) addCanopy(b);
 }
 
 function chunkify(b) {
@@ -1122,7 +1317,7 @@ function chunkify(b) {
   for (const p of b.statics) if (p.def.mech) {
     const u = p.pos.x * cs0 + p.pos.z * sn, w = -p.pos.x * sn + p.pos.z * cs0;
     const iu = Math.min(nu - 1, Math.max(0, Math.floor((u - u0) / su_))), iw = Math.min(nw - 1, Math.max(0, Math.floor((w - w0) / sw)));
-    p.def.cell = iu * nw + iw; p.def.level = nv;
+    p.def.cell = iu * nw + iw; p.def.level = p.def.canopy ? 1 : nv;
   }
 }
 
@@ -1148,7 +1343,7 @@ function splitDef(def) {
   const out = [];
   for (const p of polys) for (const [y0, y1, top] of ys) {
     const poly = area2(p) < 0 ? reverseRing(p) : p;
-    out.push(makeDef(poly, y0, y1, top, base, { bi: def.bi, cell: def.cell, level: def.level, gy: def.gy, mech: def.mech }));
+    out.push(makeDef(poly, y0, y1, top, base, { bi: def.bi, cell: def.cell, level: def.level, gy: def.gy, mech: def.mech, skin: def.skin, deco: def.deco }));
   }
   return out;
 }
@@ -1181,13 +1376,13 @@ function rebuildStatic(b, force = false) {
   if (!list.length) { b.labelOn = false; return; }
   let nv = 0;
   for (const p of list) nv += getGeo(p.def).attributes.position.count;
-  const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), uv = new Float32Array(nv * 2), kd = new Float32Array(nv);
+  const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), uv = new Float32Array(nv * 2), kd = new Float32Array(nv), dr = new Float32Array(nv * 2);
   let o = 0, top = -Infinity;
   for (const p of list) {
     const g = getGeo(p.def), n = g.attributes.position.count;
     const sp = g.attributes.position.array;
     for (let i = 0; i < n; i++) { pos[3 * (o + i)] = sp[3 * i] + p.pos.x; pos[3 * (o + i) + 1] = sp[3 * i + 1] + p.pos.y; pos[3 * (o + i) + 2] = sp[3 * i + 2] + p.pos.z; }
-    nor.set(g.attributes.normal.array, 3 * o); uv.set(g.attributes.fuv.array, 2 * o); kd.set(g.attributes.fkind.array, o);
+    nor.set(g.attributes.normal.array, 3 * o); uv.set(g.attributes.fuv.array, 2 * o); kd.set(g.attributes.fkind.array, o); dr.set(g.attributes.fdoor.array, 2 * o);
     b.ranges.push([o / 3, p]);
     top = Math.max(top, p.pos.y + p.def.hy);
     o += n;
@@ -1197,6 +1392,7 @@ function rebuildStatic(b, force = false) {
   g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
   g.setAttribute('fuv', new THREE.BufferAttribute(uv, 2));
   g.setAttribute('fkind', new THREE.BufferAttribute(kd, 1));
+  g.setAttribute('fdoor', new THREE.BufferAttribute(dr, 2));
   g.computeBoundingSphere(); g.computeBoundingBox();
   b.mesh = new THREE.Mesh(g, b.mat);
   b.mesh.castShadow = true; b.mesh.receiveShadow = true;
@@ -1256,7 +1452,7 @@ function capPieces() {
 // keep the column above a removed block from floating
 function support(b) {
   const alive = new Map();
-  for (const p of b.statics) if (p.def.level >= 0) { const k = p.def.cell + ':' + p.def.level; alive.set(k, (alive.get(k) || 0) + 1); }
+  for (const p of b.statics) if (p.def.level >= 0 && !p.def.deco) { const k = p.def.cell + ':' + p.def.level; alive.set(k, (alive.get(k) || 0) + 1); }
   const order = [...b.statics].filter((p) => p.def.level > 0).sort((a, c) => a.def.level - c.def.level);
   let fell = 0;
   for (const p of order) {
@@ -3601,6 +3797,7 @@ window.__cau = {
   lbAdd: (p, k) => lbAdd(p, k),
   cheer: (n) => cheer(n || 3, true),
   lbFetch: () => lbFetch(),
+  detail: () => B.map((b) => ({ n: b.n, style: b.style, hip: !!b.hip, door: b.door && { x: +b.door.x.toFixed(1), z: +b.door.z.toFixed(1), y: +b.door.y.toFixed(1), nx: +b.door.nx.toFixed(3), nz: +b.door.nz.toFixed(3) }, cx: Math.round(b.cx), cz: Math.round(b.cz), g: b.g, h: b.h })),
   stats: () => ({ dyn: dyn.size, world: world.size, history: history.length, bombs: bombs.length, frames, fx: fx.length, pixelRatio, trees: TREES.length, coarse: COARSE, phone: PHONE }),
 };
 window.__cauReady = true;

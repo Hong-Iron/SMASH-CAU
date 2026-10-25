@@ -13,15 +13,186 @@
     "type": "way",
     "id": 284355223
   },
-  "styles": {
-    "100주년기념관": "glass",
-    "영신관": "brick"
-  },
   "supportKakao": "https://qr.kakaopay.com/FKcOJKyOy1f405462",
   "supportToss": "supertoss://send?amount=1000&bank=%ED%86%A0%EC%8A%A4%EB%B1%85%ED%81%AC&accountNo=100123297463&origin=qr",
   "hub": "https://hong-iron.github.io/SMASH/",
   "kakaoKey": "ff20552a5a51bc1fe0e0ecdecd217f35",
   "goatcounter": "https://sassafras.goatcounter.com/count",
   "supabaseUrl": "https://qohxhopinnwrzrgxrdvj.supabase.co",
-  "supabaseKey": "sb_publishable_9RcuLHwCWIpdzjqDvXMtIA_kicFhQ8g"
+  "supabaseKey": "sb_publishable_9RcuLHwCWIpdzjqDvXMtIA_kicFhQ8g",
+  "parcels": [
+    {
+      "sigunguCd": "11590",
+      "bjdongCd": "10500",
+      "bun": "0221",
+      "ji": "0000",
+      "note": "서울 동작구 흑석동 221 (흑석로 84)"
+    }
+  ],
+  "look": {
+    "영신관": {
+      "style": "brick",
+      "wall": "#9c968a",
+      "frame": "#e6e1d6",
+      "glass": "#2b3238",
+      "roof": "#4b5452",
+      "hip": true
+    },
+    "약학대학R&D센터": {
+      "style": "glass",
+      "wall": "#d3d9da",
+      "glass": "#3e6f78",
+      "frame": "#2e3a40"
+    },
+    "파이퍼홀": {
+      "style": "ribbon",
+      "wall": "#dcdedb",
+      "glass": "#4b7b78",
+      "frame": "#9aa2a4"
+    },
+    "수림과학관": {
+      "style": "brick",
+      "wall": "#8f5039",
+      "frame": "#d9d3c8",
+      "glass": "#2c353c"
+    },
+    "제1의학관": {
+      "style": "stone",
+      "wall": "#ecebe6",
+      "frame": "#f3f3f0",
+      "glass": "#36434d"
+    },
+    "제2의학관": {
+      "style": "glass",
+      "wall": "#d8dbd9",
+      "glass": "#3f6763",
+      "frame": "#5b6466"
+    },
+    "학생회관": {
+      "style": "stone",
+      "wall": "#ecebe6",
+      "frame": "#9a6a4f",
+      "glass": "#33404a"
+    },
+    "108관": {
+      "style": "stone",
+      "wall": "#ebeae6",
+      "frame": "#9da3a6",
+      "glass": "#34414b"
+    },
+    "본관": {
+      "style": "concrete",
+      "wall": "#f0efeb",
+      "frame": "#f6f5f2",
+      "glass": "#3a4955",
+      "bay": 1.3,
+      "winW": 0.72,
+      "winH": 0.62,
+      "sill": 0.2
+    },
+    "전산정보관": {
+      "style": "brick",
+      "wall": "#8b4c37",
+      "frame": "#efece6",
+      "glass": "#2c343b"
+    },
+    "서라벌홀": {
+      "style": "stone",
+      "wall": "#e7e4dd",
+      "frame": "#8b5b45",
+      "glass": "#323c44"
+    },
+    "중앙도서관": {
+      "style": "glass",
+      "wall": "#cfd4d5",
+      "glass": "#5b7888",
+      "frame": "#3c464c"
+    },
+    "봅스트홀": {
+      "style": "stone",
+      "wall": "#e8e4da",
+      "frame": "#f1eee7",
+      "glass": "#323c45"
+    },
+    "제2공학관": {
+      "style": "concrete",
+      "wall": "#ecebe6",
+      "frame": "#f2f2ef",
+      "glass": "#5e7f98"
+    },
+    "창업보육관": {
+      "style": "stone",
+      "wall": "#edece8",
+      "frame": "#5f6366",
+      "glass": "#343f48"
+    },
+    "중앙문화예술관": {
+      "style": "brick",
+      "wall": "#994a31",
+      "frame": "#ece3d4",
+      "glass": "#2d3a37"
+    },
+    "대학원": {
+      "style": "stone",
+      "wall": "#e6e2d8",
+      "frame": "#d6d1c6",
+      "glass": "#2f3a42",
+      "roof": "#5a4a40",
+      "hip": true
+    },
+    "법학관": {
+      "style": "stone",
+      "wall": "#dcd5c5",
+      "frame": "#ece7dc",
+      "glass": "#3c5551"
+    },
+    "교수연구동": {
+      "style": "ribbon",
+      "wall": "#d9d4c7",
+      "glass": "#4f7074",
+      "frame": "#c9c3b5"
+    },
+    "way/367405910": {
+      "style": "concrete",
+      "wall": "#d9d2c3",
+      "glass": "#5d7a80",
+      "frame": "#c9c2b2"
+    },
+    "글로벌하우스": {
+      "style": "dorm",
+      "wall": "#efefec",
+      "frame": "#d3d6d8",
+      "glass": "#3a4650"
+    },
+    "블루미르홀": {
+      "style": "dorm",
+      "wall": "#f1f0ec",
+      "frame": "#e6e3dc",
+      "glass": "#38444e",
+      "hip": false
+    },
+    "100주년기념관": {
+      "style": "stone",
+      "wall": "#e9eaea",
+      "frame": "#f2f3f3",
+      "glass": "#3b4b57",
+      "bay": 1.6,
+      "winW": 0.55,
+      "winH": 0.62,
+      "sill": 0.2
+    }
+  },
+  "lookSource": "중앙대학교 캠퍼스맵 건물 사진(cau.ac.kr)과 위키미디어 공용 사진의 색만 참고. 사진 픽셀은 쓰지 않음",
+  "floorsManual": {
+    "way/607563320": {
+      "lv": 15,
+      "h": 53.1,
+      "note": "블루미르홀 308관 추정: 건축물대장 '학생기숙사' 15층. 두 동 중 작은 동(450실)"
+    },
+    "way/607563321": {
+      "lv": 12,
+      "h": 43.0,
+      "note": "블루미르홀 309관 추정: 건축물대장 '학생기숙사 2차' 12층. 두 동 중 큰 동(716실)"
+    }
+  }
 }

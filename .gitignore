@@ -1,3 +1,5 @@
 raw/
 .DS_Store
 __pycache__/
+.env
+data/floors.json
