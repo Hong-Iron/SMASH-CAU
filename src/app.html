@@ -433,7 +433,9 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "postprocessing": "./pp-stub.js"
 } }
 </script>
 <script type="module">
@@ -443,6 +445,23 @@ import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const D = JSON.parse(document.getElementById('cau-data').textContent);
+// keep only a thin band of ground around the campus, so the campus does not sit on a wide empty block
+{
+  const t = D.terrain, M = 26;
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  const grow = ([x, z]) => { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); };
+  for (const r of D.campus) r.forEach(grow);
+  for (const b of D.buildings) b.o.forEach(grow);
+  const j0 = Math.max(0, Math.floor((x0 - M - t.x0) / t.step)), j1 = Math.min(t.nx - 1, Math.ceil((x1 + M - t.x0) / t.step));
+  const i0 = Math.max(0, Math.floor((z0 - M - t.z0) / t.step)), i1 = Math.min(t.nz - 1, Math.ceil((z1 + M - t.z0) / t.step));
+  if (j0 > 0 || i0 > 0 || j1 < t.nx - 1 || i1 < t.nz - 1) {
+    const nx = j1 - j0 + 1, nz = i1 - i0 + 1, dm = new Array(nx * nz);
+    for (let i = 0; i < nz; i++) for (let j = 0; j < nx; j++) dm[i * nx + j] = t.dm[(i + i0) * t.nx + j + j0];
+    D.terrain = { ...t, x0: t.x0 + j0 * t.step, z0: t.z0 + i0 * t.step, nx, nz, dm };
+    const ex0 = D.terrain.x0 + 1, ez0 = D.terrain.z0 + 1, ex1 = D.terrain.x0 + (nx - 1) * t.step - 1, ez1 = D.terrain.z0 + (nz - 1) * t.step - 1;
+    D.trees = D.trees.filter(([x, z]) => x > ex0 && x < ex1 && z > ez0 && z < ez1);
+  }
+}
 const T = D.terrain;
 const W = (T.nx - 1) * T.step, H = (T.nz - 1) * T.step;
 const CFG = D.config || {};
@@ -480,6 +499,9 @@ const COARSE = matchMedia('(pointer: coarse)').matches;
 const PHONE = COARSE && Math.min(screen.width, screen.height) < 820;
 const PR_MAX = Math.min(devicePixelRatio || 1, COARSE ? 1.5 : 2), PR_MIN = COARSE ? 0.75 : 1;
 let pixelRatio = PR_MAX;
+const QS = new URLSearchParams(location.search);
+const GFX = { ao: QS.has('ao') ? QS.get('ao') !== '0' : !COARSE, fps: QS.has('fps') };
+const PR_AO = Math.min(PR_MAX, 1.5);
 let renderer;
 try {
   renderer = new THREE.WebGLRenderer({ antialias: !(COARSE && devicePixelRatio >= 2), powerPreference: 'high-performance' });
@@ -492,6 +514,9 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.62;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = COARSE ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+// the sun and its shadow box never move, so the shadow map is redrawn only when something in the scene moves
+renderer.shadowMap.autoUpdate = false;
+let shadowDirty = true;
 stage.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -621,6 +646,20 @@ tMat.onBeforeCompile = (sh) => {
     .replace('#include <map_fragment>', `#include <map_fragment>
       diffuseColor.rgb *= 0.86 + 0.28 * fbm(vWP.xz * 0.45);
       diffuseColor.rgb *= 0.92 + 0.16 * vnoise(vWP.xz * 4.0);
+      {
+        vec3 c0 = diffuseColor.rgb;
+        float lum = dot(c0, vec3(0.299, 0.587, 0.114)), sat = max(c0.r, max(c0.g, c0.b)) - min(c0.r, min(c0.g, c0.b));
+        float grassy = smoothstep(0.015, 0.05, c0.g - max(c0.r, c0.b));
+        float paved = (1.0 - grassy) * (1.0 - smoothstep(0.05, 0.1, sat)) * smoothstep(0.12, 0.2, lum);
+        vec2 pq = vWP.xz / vec2(0.6, 0.3); pq.x += 0.5 * mod(floor(pq.y), 2.0);
+        vec2 pf = fract(pq), pw = fwidth(pq);
+        float pfar = smoothstep(0.25, 0.7, max(pw.x, pw.y));
+        float joint = 1.0 - smoothstep(0.0, 0.05 + pw.x, pf.x) * smoothstep(0.0, 0.1 + pw.y, pf.y);
+        float tone = 0.88 + 0.24 * h21(floor(pq));
+        diffuseColor.rgb *= mix(1.0, mix(tone * (1.0 - 0.3 * joint), 1.0, pfar), paved);
+        float gn = 0.6 * vnoise(vWP.xz * 2.7) + 0.4 * vnoise(vWP.xz * 9.0);
+        diffuseColor.rgb *= mix(1.0, 0.8 + 0.4 * gn, grassy);
+      }
       vec3 gGlowT = vec3(0.0);
       if (vDig > 0.25) {
         float n = fbm(vWP.xz * 0.35 + vec2(vWP.y * 0.21, -vWP.y * 0.17));
@@ -655,6 +694,7 @@ const sPos = new Float32Array((rim.length - 1) * 18);
 const sGeo = new THREE.BufferGeometry();
 sGeo.setAttribute('position', new THREE.BufferAttribute(sPos, 3));
 function updateSkirt() {
+  shadowDirty = true;
   let o = 0;
   const P = (k, top) => { sPos[o++] = tPos[3 * k]; sPos[o++] = top ? tPos[3 * k + 1] : BASE; sPos[o++] = tPos[3 * k + 2]; };
   for (let n = 0; n < rim.length - 1; n++) { const a = rim[n], b = rim[n + 1]; P(a, true); P(a, false); P(b, true); P(b, true); P(a, false); P(b, false); }
@@ -676,8 +716,17 @@ function paintGround() {
   const X = (x) => (x - T.x0) * PX, Y = (z) => (z - T.z0) * PX;
   const ring = (r) => { r.forEach(([x, z], i) => (i ? g.lineTo(X(x), Y(z)) : g.moveTo(X(x), Y(z)))); g.closePath(); };
   const line = (p) => { g.beginPath(); p.forEach(([x, z], i) => (i ? g.lineTo(X(x), Y(z)) : g.moveTo(X(x), Y(z)))); g.stroke(); };
-  g.fillStyle = '#86847a'; g.fillRect(0, 0, cw, ch);
-  g.beginPath(); D.campus.forEach(ring); g.fillStyle = '#b1ab9e'; g.fill();
+  g.fillStyle = '#7f7d74'; g.fillRect(0, 0, cw, ch);
+  g.beginPath(); D.campus.forEach(ring); g.fillStyle = '#6f8550'; g.fill();
+  // paving runs along roads and around buildings; ground far from both is lawn and planting
+  g.save(); g.beginPath(); D.campus.forEach(ring); g.clip();
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  for (const [extra, a] of [[4, 0.45], [0, 1]]) {
+    g.globalAlpha = a; g.strokeStyle = g.fillStyle = '#9b9588';
+    for (const r of D.roads) { g.lineWidth = ((ROAD_W[r.k] || 2) + (FOOT.has(r.k) ? 5 : 12) + extra) * PX; line(r.p); }
+    for (const b of D.buildings) { g.beginPath(); ring(b.o); g.lineWidth = (18 + extra) * PX; g.stroke(); g.fill(); }
+  }
+  g.globalAlpha = 1; g.restore();
   // steep ground is planted, flat ground stays paved
   g.fillStyle = '#58703c';
   for (let i = 0; i < T.nz - 1; i++) for (let j = 0; j < T.nx - 1; j++) {
@@ -688,12 +737,6 @@ function paintGround() {
     g.fillRect(X(T.x0 + j * T.step) - 0.5, Y(T.z0 + i * T.step) - 0.5, T.step * PX + 1, T.step * PX + 1);
   }
   g.globalAlpha = 1;
-  g.save(); g.beginPath(); D.campus.forEach(ring); g.clip();
-  const joint = Math.max(1.5, 5 / PX) * PX;
-  g.strokeStyle = 'rgba(60,55,45,.10)'; g.lineWidth = 1;
-  for (let x = 0; x < cw; x += joint) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, ch); g.stroke(); }
-  for (let y = 0; y < ch; y += joint) { g.beginPath(); g.moveTo(0, y); g.lineTo(cw, y); g.stroke(); }
-  g.restore();
   const LAND = { res: '#9b978b', park: '#62823f', wood: '#405f2f', pitch: '#3f7d45', water: '#3c6179', construction: '#a08a6c' };
   for (const k of ['res', 'park', 'wood', 'pitch', 'water', 'construction']) {
     g.fillStyle = LAND[k];
@@ -701,6 +744,13 @@ function paintGround() {
   }
   g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 0.18 * PX;
   for (const L of D.lands) if (L.k === 'pitch') { g.beginPath(); L.r.forEach(ring); g.stroke(); }
+  // a paved apron of lighter slabs around every building, with its own joint lines
+  g.lineJoin = 'round';
+  g.strokeStyle = '#aea89a'; g.lineWidth = 7 * PX;
+  for (const b of D.buildings) { g.beginPath(); ring(b.o); g.stroke(); }
+  g.strokeStyle = 'rgba(70,64,52,.16)'; g.lineWidth = Math.max(1, 0.06 * PX); g.setLineDash([0.06 * PX, 1.2 * PX]);
+  for (const b of D.buildings) { g.beginPath(); ring(b.o); g.lineWidth = 6.6 * PX; g.stroke(); }
+  g.setLineDash([]);
   // soft blotches: worn grass, stains, shade
   for (let n = 0; n < 3400; n++) {
     const x = R() * cw, y = R() * ch, r = (6 + R() * 40) * PX / 2.6;
@@ -739,6 +789,11 @@ function paintGround() {
   g.globalCompositeOperation = 'overlay'; g.globalAlpha = 0.45;
   g.fillStyle = g.createPattern(nc, 'repeat'); g.fillRect(0, 0, cw, ch);
   g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+  // soft contact shadow where walls meet the ground (several widening strokes stand in for a blur)
+  for (const [w, a] of [[5, 0.05], [3.2, 0.07], [1.8, 0.09], [0.8, 0.12]]) {
+    g.strokeStyle = `rgba(20,18,14,${a})`; g.lineWidth = w * PX;
+    for (const b of D.buildings) { g.beginPath(); ring(b.o); g.stroke(); }
+  }
   groundTex.needsUpdate = true;
 }
 paintGround();
@@ -746,10 +801,11 @@ paintGround();
 // ============ trees (instanced)
 const TREES = PHONE ? D.trees.filter((_, i) => i % 2 === 0) : D.trees;
 const treeHidden = new Uint8Array(TREES.length);
-const trunkGeo = new THREE.CylinderGeometry(0.18, 0.28, 1, 6); trunkGeo.translate(0, 0.5, 0);
+// trees are most of the scene's triangles, so they stay light: 20-face crown blobs with smooth normals, an open 5-sided trunk
+const trunkGeo = new THREE.CylinderGeometry(0.18, 0.28, 1, 5, 1, true); trunkGeo.translate(0, 0.5, 0);
 const crownGeo = (() => {
   const parts = [[0, 0, 0, 1], [0.5, -0.16, 0.24, 0.7], [-0.44, -0.1, -0.26, 0.72], [0.04, 0.42, -0.1, 0.62]].map(([ox, oy, oz, r]) => {
-    const g0 = mergeVertices(new THREE.IcosahedronGeometry(r, 1).deleteAttribute('normal').deleteAttribute('uv'));
+    const g0 = mergeVertices(new THREE.IcosahedronGeometry(r, 0).deleteAttribute('normal').deleteAttribute('uv'));
     const p = g0.attributes.position;
     for (let i = 0; i < p.count; i++) {
       const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
@@ -789,6 +845,7 @@ crowns.castShadow = !PHONE; crowns.receiveShadow = true; trunks.castShadow = !CO
 }
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _p = new THREE.Vector3();
 function placeTrees() {
+  shadowDirty = true;
   for (let i = 0; i < TREES.length; i++) {
     const [x, z, s] = TREES[i], y = groundY(x, z), k = treeHidden[i] ? 0 : 1;
     _q.setFromAxisAngle(_s.set(0, 1, 0), (i * 2.399) % 6.283);
@@ -826,9 +883,15 @@ uniform vec3 uWall; uniform vec3 uGlass; uniform vec3 uRoof; uniform vec3 uFrame
 uniform float uBay; uniform float uFloor; uniform float uWinW; uniform float uWinH; uniform float uSill; uniform float uBrick; uniform float uSeed; uniform float uGlassRough; uniform float uTop; uniform float uLo; uniform float uNight;
 varying vec2 vFuv; varying float vKind; varying vec2 vDoor;
 ${NOISE}
-float band(float x, float a, float b, float w) { return clamp(smoothstep(a - w, a + w, x) - smoothstep(b - w, b + w, x), 0.0, 1.0); }`)
+float band(float x, float a, float b, float w) { return clamp(smoothstep(a - w, a + w, x) - smoothstep(b - w, b + w, x), 0.0, 1.0); }
+vec3 bumpN(vec3 p, vec3 n, vec2 dh, float fd) {
+  vec3 sx = normalize(dFdx(p)), sy = normalize(dFdy(p));
+  vec3 r1 = cross(sy, n), r2 = cross(n, sx);
+  float det = dot(sx, r1) * fd;
+  return normalize(abs(det) * n - sign(det) * (dh.x * r1 + dh.y * r2));
+}`)
     .replace('#include <color_fragment>', `#include <color_fragment>
-float gGlass = 0.0, gLit = 0.0;
+float gGlass = 0.0, gLit = 0.0, gHgt = 0.0;
 vec3 gLitCol = vec3(1.0, 0.76, 0.42);
 {
   vec2 c = vFuv / vec2(uBay, uFloor);
@@ -866,6 +929,7 @@ vec3 gLitCol = vec3(1.0, 0.76, 0.42);
     float slab = 1.0 - smoothstep(0.0, 0.05 + fw.y, f.y);
     wall *= 1.0 - 0.14 * slab * (1.0 - far);
     wall *= 1.0 - 0.08 * vnoise(vec2(vFuv.x * 0.7, vFuv.y * 0.07) + uSeed);
+    wall *= mix(0.74, 1.0, smoothstep(uLo, uLo + 3.0, vFuv.y));
     float plinth = 1.0 - smoothstep(uLo + 0.55, uLo + 0.6 + fwy, vFuv.y);
     wall = mix(wall, uWall * 0.55 + vec3(0.035), plinth);
     float cornice = smoothstep(uTop - 0.7 - fwy, uTop - 0.6, vFuv.y);
@@ -873,12 +937,23 @@ vec3 gLitCol = vec3(1.0, 0.76, 0.42);
     vec3 glass = uGlass * (0.65 + 0.7 * h21(cell + uSeed * 1.7));
     glass = mix(glass, vec3(0.42, 0.41, 0.38), step(0.93, h21(cell * 1.31 + uSeed)) * 0.5);
     glass *= mix(0.5, 1.0, smoothstep(0.0, 0.3, (sill + wh - f.y) / max(wh, 0.01)));
+    // the pane sits back in the wall: the head and one jamb throw a thin shade onto it
+    float rTop = 1.0 - smoothstep(0.0, 0.16, (sill + wh - f.y) / max(wh, 0.01));
+    float rSide = 1.0 - smoothstep(0.0, 0.1, (f.x - 0.5 + ww * 0.5) / max(ww, 0.01));
+    glass *= 1.0 - 0.42 * max(rTop, 0.75 * rSide) * (1.0 - far);
     vec3 nearC = mix(wall, glass, win);
     nearC = mix(nearC, uFrame, clamp(frame + bars, 0.0, 1.0));
     nearC = mix(nearC, uFrame * 1.05, ledge * 0.8);
+    // a soft shade under each sill and under the slab line
+    float underSill = band(f.y, sill - fr.y - 0.2 / uFloor, sill - fr.y - 0.07 / uFloor, fw.y) * fx * above;
+    nearC *= 1.0 - 0.22 * underSill * (1.0 - win);
     float cover = ww * wh * 0.85 * above;
     vec3 farC = mix(wall, mix(uGlass, uFrame, 0.25), cover);
     col = mix(nearC, farC, far);
+    // relief: glass sits 0.35 in, frames and sills stand proud, slabs and brick joints read as grooves
+    float mortarH = 0.0;
+    if (uBrick > 0.5) { vec2 bf2 = fract(bc); mortarH = (1.0 - smoothstep(0.0, 0.07 + bw.x, bf2.x) * smoothstep(0.0, 0.14 + bw.y, bf2.y)) * (1.0 - smoothstep(0.25, 0.7, max(bw.x, bw.y))); }
+    gHgt = (-0.35 * win + 0.12 * frame + 0.1 * bars + 0.22 * ledge - 0.08 * slab - 0.05 * mortarH + 0.18 * cornice) * (1.0 - far);
     gGlass = mix(win * (1.0 - bars), cover, far);
     float lit = step(0.5, h21(cell * 2.37 + uSeed * 3.1)) * step(uLo + 1.0, vFuv.y);
     gLitCol = mix(vec3(1.0, 0.74, 0.4), vec3(0.82, 0.9, 1.0), step(0.62, h21(cell * 0.71 + uSeed * 1.3)));
@@ -902,6 +977,7 @@ vec3 gLitCol = vec3(1.0, 0.76, 0.42);
       gGlass = mix(gGlass, mix(shop * pane, 0.5, far), gz);
       gLit = mix(gLit, mix(shop * pane, 0.4, far) * 0.8, gz);
       gLitCol = mix(gLitCol, vec3(1.0, 0.82, 0.55), gz);
+      gHgt = mix(gHgt, (0.16 * pier - 0.3 * shop * pane + 0.12 * fascia) * (1.0 - far), gz);
     }
     // main entrance (the face that looks at the nearest road): a framed double glass door
     {
@@ -917,6 +993,7 @@ vec3 gLitCol = vec3(1.0, 0.76, 0.42);
       gGlass = mix(gGlass, 1.0, leaf);
       gLit = mix(gLit, 1.0, leaf);
       gLitCol = mix(gLitCol, vec3(1.0, 0.85, 0.6), leaf);
+      gHgt = mix(gHgt, -0.45, leaf) + 0.1 * clamp(surround - leaf, 0.0, 1.0);
     }
   } else if (vKind < 1.5) {
     vec3 roof = uRoof * (0.78 + 0.32 * fbm(vFuv * 0.22 + uSeed));
@@ -944,11 +1021,13 @@ vec3 gLitCol = vec3(1.0, 0.76, 0.42);
     float jx = vFuv.x / 0.9 + 0.5 * mod(floor(row), 2.0);
     t *= 1.0 - 0.14 * (1.0 - smoothstep(0.0, 0.06 + fwidth(jx), fract(jx))) * fade;
     col = t;
+    gHgt = 0.08 * smoothstep(0.0, 0.3, fract(row)) * fade;
   }
   diffuseColor.rgb = col;
 }`)
+    .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = bumpN(-vViewPosition, normal, vec2(dFdx(gHgt), dFdy(gHgt)) * 3.2 * (1.0 - 0.75 * gGlass), faceDirection);')
     .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, uGlassRough, gGlass);')
-    .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, 0.1, gGlass);')
+    .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, 0.72, gGlass);\ndiffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.35 + 0.05, gGlass);')
     .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += uNight * gLitCol * gLit * 1.5;');
 }
 function hashStr(s) { let h = 2166136261; for (const ch of s) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
@@ -1370,7 +1449,7 @@ function rebuildStatic(b, force = false) {
   const list = [...b.statics];
   if (!force && list.length === b.built.length && list.every((p, i) => p === b.built[i])) return;
   b.built = list;
-  sgrid = null;
+  sgrid = null; shadowDirty = true;
   if (b.mesh) { scene.remove(b.mesh); b.mesh.geometry.dispose(); b.mesh = null; }
   b.ranges = [];
   if (!list.length) { b.labelOn = false; return; }
@@ -2391,7 +2470,7 @@ function scanDeepest() {
 }
 function refreshTerrain(i0 = 0, i1 = T.nz - 1, j0 = 0, j1 = T.nx - 1) {
   for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const k = i * T.nx + j; tPos[3 * k + 1] = elev[k]; tDig[k] = elev0[k] - elev[k]; }
-  tGeo.attributes.position.needsUpdate = true; tGeo.attributes.dig.needsUpdate = true;
+  tGeo.attributes.position.needsUpdate = true; tGeo.attributes.dig.needsUpdate = true; shadowDirty = true;
   tGeo.computeVertexNormals();
   if (i0 === 0 || j0 === 0 || i1 === T.nz - 1 || j1 === T.nx - 1) updateSkirt();
   updateGlow();
@@ -3362,7 +3441,7 @@ async function makeCard(st) {
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
   const g = cv.getContext('2d');
   g.fillStyle = '#0b0d12'; g.fillRect(0, 0, W, H);
-  renderer.render(scene, camera);
+  draw();
   const src = renderer.domElement, k = Math.max(W / src.width, IH / src.height);
   g.save(); g.beginPath(); g.rect(0, 0, W, IH); g.clip();
   g.drawImage(src, (W - src.width * k) / 2, (IH - src.height * k) / 2, src.width * k, src.height * k);
@@ -3662,16 +3741,61 @@ syncReticleColor();
 function resize() {
   const w = stage.clientWidth, h = stage.clientHeight;
   renderer.setSize(w, h, false);
+  if (post) post.setSize(w, h);
   camera.aspect = w / Math.max(1, h);
   camera.fov = camera.aspect < 1 ? 52 : 38;
   camera.updateProjectionMatrix();
   labelKey = ''; obstaclesAt = -99;
 }
 new ResizeObserver(resize).observe(stage);
+
+// ============ post: ambient occlusion (N8AO, half resolution) + SMAA, PC by default
+// hardware MSAA does not survive the AO pass, so SMAA smooths the edges instead
+let post = null, drawN = 0, shadowN = 0;
+function draw() { drawN++; if (renderer.shadowMap.needsUpdate) shadowN++; if (post) post.composer.render(); else renderer.render(scene, camera); }
+async function enableAO() {
+  try {
+    const [{ EffectComposer }, { OutputPass }, { SMAAPass }, { N8AOPass }] = await Promise.all([
+      import('three/addons/postprocessing/EffectComposer.js'), import('three/addons/postprocessing/OutputPass.js'),
+      import('three/addons/postprocessing/SMAAPass.js'), import('https://cdn.jsdelivr.net/npm/n8ao@1.10.3/dist/N8AO.js')]);
+    const w = stage.clientWidth, h = stage.clientHeight;
+    const composer = new EffectComposer(renderer);
+    const ao = new N8AOPass(scene, camera, w, h);
+    Object.assign(ao.configuration, { aoRadius: 6, distanceFalloff: 1, intensity: 3.2, halfRes: true, gammaCorrection: false, transparencyAware: false });
+    ao.setQualityMode('Medium');
+    const smaa = new SMAAPass(w * renderer.getPixelRatio(), h * renderer.getPixelRatio());
+    composer.addPass(ao); composer.addPass(new OutputPass()); composer.addPass(smaa);
+    post = { composer, ao, smaa, setSize: (W2, H2) => composer.setSize(W2, H2) };
+    if (pixelRatio > PR_AO) { pixelRatio = PR_AO; renderer.setPixelRatio(PR_AO); }
+    composer.setPixelRatio(renderer.getPixelRatio());
+    composer.setSize(w, h);
+  } catch (e) { post = null; console.warn('AO off:', e); }
+}
+if (GFX.ao) enableAO();
+// frame counter for checking phones: add ?fps to the address
+const fpsEl = GFX.fps ? Object.assign(document.createElement('div'), { id: 'fps' }) : null;
+let fpsT = 0, fpsN = 0;
+if (fpsEl) { fpsEl.style.cssText = 'position:fixed;left:50%;top:6px;transform:translateX(-50%);z-index:90;font:500 13px/1.2 "IBM Plex Mono",monospace;background:rgba(0,0,0,.65);color:#fff;padding:3px 8px;border-radius:6px;pointer-events:none'; document.body.appendChild(fpsEl); }
+function tickFps(dt) {
+  fpsT += dt; fpsN++;
+  if (fpsT >= 1) { fpsEl.textContent = `${Math.round(fpsN / fpsT)} fps · ${Math.round(1000 * fpsT / fpsN)} ms · x${pixelRatio.toFixed(2)}${post ? ' · AO' : ''}`; fpsT = 0; fpsN = 0; }
+}
 const needle = $('needle');
 let last = performance.now(), frames = 0;
 const shakeOff = new THREE.Vector3();
 let frozen = false;
+// ============ render on demand: a still camera over a still campus is not redrawn (phones keep their battery)
+const camPos = new THREE.Vector3(), camQ = new THREE.Quaternion();
+let camFov = 0, lastDraw = 0, kickUntil = 0, lockDraw = false;
+const kick = (ms = 700) => { kickUntil = Math.max(kickUntil, performance.now() + ms); };
+for (const ev of ['pointerdown', 'pointermove', 'pointerup', 'wheel', 'keydown', 'touchstart', 'touchmove']) addEventListener(ev, () => kick(), { passive: true, capture: true });
+function sceneBusy(now) {
+  if (bombs.length || fx.length || swings.length || quake || laserBeam || laserDraw || cine || rewind || anim || shockAt) return true;
+  if (trauma > 0.001 || hitStop > 0 || expoBoost > 0 || expoDip > 0 || fogHeat > 0 || glowBase > 0 || maxDig > 60) return true;
+  if (dust.n || smoke.n || sparks.n) return true;
+  for (const p of dyn) if (!p.sleep) return true;
+  return false;
+}
 function simulate(rdt, now) {
   if (frozen) return;
   if (rewind) { updateRewind(rdt); return; }
@@ -3696,8 +3820,17 @@ function adaptQuality(realDt, now) {
   perfT += realDt; perfN++;
   if (perfT < 2) return;
   const fps = perfN / perfT; perfT = 0; perfN = 0;
-  if (fps < 45 && pixelRatio > PR_MIN) { pixelRatio = Math.max(PR_MIN, pixelRatio - 0.25); renderer.setPixelRatio(pixelRatio); resize(); raiseAfter = now + 10000; }
-  else if (fps > 58 && pixelRatio < PR_MAX && now > raiseAfter) { pixelRatio = Math.min(PR_MAX, pixelRatio + 0.25); renderer.setPixelRatio(pixelRatio); resize(); raiseAfter = now + 10000; }
+  // a slow GPU first gives up resolution, then the AO pass
+  if (fps < 40 && pixelRatio <= PR_MIN && post && !QS.has('ao')) { post.composer.dispose(); post = null; raiseAfter = now + 10000; return; }
+  if (fps < 45 && pixelRatio > PR_MIN) { setPR(Math.max(PR_MIN, pixelRatio - 0.25)); raiseAfter = now + 10000; }
+  else if (fps > 58 && pixelRatio < (post ? PR_AO : PR_MAX) && now > raiseAfter) { setPR(Math.min(post ? PR_AO : PR_MAX, pixelRatio + 0.25)); raiseAfter = now + 10000; }
+}
+let lockPR = false;
+function setPR(v) {
+  if (lockPR) return;
+  pixelRatio = v; renderer.setPixelRatio(v);
+  if (post) post.composer.setPixelRatio(v);
+  resize();
 }
 function frame(now) {
   const realDt = Math.min(0.5, (now - last) / 1000);
@@ -3716,6 +3849,11 @@ function frame(now) {
   tUni.uTime.value = now / 1000;
   if (glowBase > 0) glowLight.intensity = glowBase * (0.85 + 0.15 * Math.sin(now * 0.006) * Math.sin(now * 0.0023 + 1));
   if (hoverEv) { hover(hoverEv); hoverEv = null; }
+  const live = sceneBusy(now);
+  const moved = !camPos.equals(camera.position) || !camQ.equals(camera.quaternion) || camera.fov !== camFov;
+  if (!live && !moved && !shadowDirty && now >= kickUntil && now - lastDraw < 1000 && !lockDraw) { updateLabels(); requestAnimationFrame(frame); return; }
+  camPos.copy(camera.position); camQ.copy(camera.quaternion); camFov = camera.fov; lastDraw = now;
+  if (live || shadowDirty) { renderer.shadowMap.needsUpdate = true; shadowDirty = false; }
   if (trauma > 0.001) {
     const s2 = trauma * trauma, tt = now / 1000;
     const ref = cine ? lookTmp : controls.target;
@@ -3723,10 +3861,11 @@ function frame(now) {
     shakeOff.set(wobble(tt * 24), wobble(tt * 24 + 31), wobble(tt * 24 + 67)).multiplyScalar(amp);
     camera.position.add(shakeOff);
     camera.rotateZ(wobble(tt * 19 + 5) * 0.025 * s2 * (reduceMotion ? 0.25 : 1));
-    renderer.render(scene, camera);
+    draw();
     camera.position.sub(shakeOff);
     trauma = Math.max(0, trauma - rdt * (cine ? 0.45 : 1.05));
-  } else renderer.render(scene, camera);
+  } else draw();
+  if (fpsEl) tickFps(realDt);
   updateLabels();
   needle.setAttribute('transform', `rotate(${(controls.getAzimuthalAngle() * 180 / Math.PI).toFixed(1)} 15 15)`);
   requestAnimationFrame(frame);
@@ -3797,6 +3936,22 @@ window.__cau = {
   lbAdd: (p, k) => lbAdd(p, k),
   cheer: (n) => cheer(n || 3, true),
   lbFetch: () => lbFetch(),
+  bench(n = 30, pr, shadow) {
+    const keep = pixelRatio; lockPR = false; if (pr) setPR(pr); lockPR = true;
+    const gl = renderer.getContext(), px = new Uint8Array(4);
+    draw(); gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    const sh = renderer.shadowMap.needsUpdate;
+    const t0 = performance.now();
+    for (let i = 0; i < n; i++) { renderer.shadowMap.needsUpdate = shadow !== false; draw(); }
+    renderer.shadowMap.needsUpdate = sh;
+    gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    const ms = (performance.now() - t0) / n;
+    lockPR = false; if (pr) setPR(keep);
+    return { ms: +ms.toFixed(2), w: renderer.domElement.width, h: renderer.domElement.height, ao: !!post, pr: pr || keep, calls: renderer.info.render.calls, tris: renderer.info.render.triangles };
+  },
+  setAO: (v) => { if (v && !post) return enableAO().then(() => !!post); if (!v && post) { post.composer.dispose(); post = null; } return !!post; },
+  idle: () => ({ busy: sceneBusy(performance.now()), lastDraw: Math.round(performance.now() - lastDraw) }),
+  gfx: () => ({ draws: drawN, shadows: shadowN, frames, ao: !!post, want: GFX.ao, pixelRatio, coarse: COARSE, phone: PHONE, terrain: [T.nx, T.nz], trees: TREES.length }),
   detail: () => B.map((b) => ({ n: b.n, style: b.style, hip: !!b.hip, door: b.door && { x: +b.door.x.toFixed(1), z: +b.door.z.toFixed(1), y: +b.door.y.toFixed(1), nx: +b.door.nx.toFixed(3), nz: +b.door.nz.toFixed(3) }, cx: Math.round(b.cx), cz: Math.round(b.cz), g: b.g, h: b.h })),
   stats: () => ({ dyn: dyn.size, world: world.size, history: history.length, bombs: bombs.length, frames, fx: fx.length, pixelRatio, trees: TREES.length, coarse: COARSE, phone: PHONE }),
 };
