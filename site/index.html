@@ -3799,11 +3799,17 @@ async function enableAO() {
 if (GFX.ao) enableAO();
 // frame counter for checking phones: add ?fps to the address
 const fpsEl = GFX.fps ? Object.assign(document.createElement('div'), { id: 'fps' }) : null;
-let fpsT = 0, fpsN = 0;
+let fpsT = 0, fpsN = 0, fpsD = 0, fpsMs = 0;
 if (fpsEl) { fpsEl.style.cssText = 'position:fixed;left:50%;top:6px;transform:translateX(-50%);z-index:90;font:500 13px/1.2 "IBM Plex Mono",monospace;background:rgba(0,0,0,.65);color:#fff;padding:3px 8px;border-radius:6px;pointer-events:none'; document.body.appendChild(fpsEl); }
-function tickFps(dt) {
+// fps counts every animation frame; "그림" is how many of them were actually drawn (a still view draws once a second)
+function tickFps(dt, drew) {
   fpsT += dt; fpsN++;
-  if (fpsT >= 1) { fpsEl.textContent = `${Math.round(fpsN / fpsT)} fps · ${Math.round(1000 * fpsT / fpsN)} ms · x${pixelRatio.toFixed(2)}${post ? ' · AO' : ''}`; fpsT = 0; fpsN = 0; }
+  if (drew) { fpsD++; fpsMs += dt; }
+  if (fpsT >= 1) {
+    const busy = fpsD > 2 ? ` · ${Math.round(1000 * fpsMs / fpsD)} ms` : ' · 멈춤';
+    fpsEl.textContent = `${Math.round(fpsN / fpsT)} fps · 그림 ${fpsD}/s${busy} · x${pixelRatio.toFixed(2)}${post ? ' · AO' : ''}`;
+    fpsT = 0; fpsN = 0; fpsD = 0; fpsMs = 0;
+  }
 }
 const needle = $('needle');
 let last = performance.now(), frames = 0;
@@ -3876,7 +3882,7 @@ function frame(now) {
   if (hoverEv) { hover(hoverEv); hoverEv = null; }
   const live = sceneBusy(now);
   const moved = !camPos.equals(camera.position) || !camQ.equals(camera.quaternion) || camera.fov !== camFov;
-  if (!live && !moved && !shadowDirty && now >= kickUntil && now - lastDraw < 1000 && !lockDraw) { updateLabels(); requestAnimationFrame(frame); return; }
+  if (!live && !moved && !shadowDirty && now >= kickUntil && now - lastDraw < 1000 && !lockDraw) { if (fpsEl) tickFps(realDt, false); updateLabels(); requestAnimationFrame(frame); return; }
   camPos.copy(camera.position); camQ.copy(camera.quaternion); camFov = camera.fov; lastDraw = now;
   if (live || shadowDirty) { renderer.shadowMap.needsUpdate = true; shadowDirty = false; }
   if (trauma > 0.001) {
@@ -3890,7 +3896,7 @@ function frame(now) {
     camera.position.sub(shakeOff);
     trauma = Math.max(0, trauma - rdt * (cine ? 0.45 : 1.05));
   } else draw();
-  if (fpsEl) tickFps(realDt);
+  if (fpsEl) tickFps(realDt, true);
   updateLabels();
   needle.setAttribute('transform', `rotate(${(controls.getAzimuthalAngle() * 180 / Math.PI).toFixed(1)} 15 15)`);
   requestAnimationFrame(frame);
