@@ -273,6 +273,105 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
   .pop { animation: fadeOnly 1.4s forwards; transform: translate(var(--x), var(--y)) translate(-50%, -100%); }
   .banner { animation: fadeBanner 4.4s forwards; transform: translate(-50%, -50%); }
 }
+
+/* ============ game HUD: solid warm-charcoal panels over the scene, the weapon bar at the bottom centre.
+   No translucent blur or glow: the chosen weapon is the one solid orange thing on screen */
+:root { --hud: #1c1b19; --hud-2: #262420; --hud-line: #3a3731; --hud-fg: #ece8df; --hud-mute: #a39d92; --hot: #ff5a1f; --hr: 5px; }
+.side { display: contents; }
+.titlebar, .dock, .hud .score, .lb, .compass, .depth, #cheer, .toolopt, .opts {
+  background: var(--hud); border: 1px solid var(--hud-line); color: var(--hud-fg); box-shadow: 0 2px 0 rgba(0, 0, 0, .35);
+}
+.titlebar { position: absolute; top: 16px; left: 16px; padding: 6px 6px 6px 12px; border-radius: var(--hr); }
+.titlebar h1 { color: var(--hud-fg); font-size: 19px; }
+.hub-link { background: var(--hud-2); border-color: var(--hud-line); color: var(--hud-fg); border-radius: 3px; }
+.hub-link:hover { background: #2f2c27; border-color: var(--hot); }
+
+.dock { position: absolute; left: 50%; bottom: 30px; transform: translateX(-50%); display: flex; align-items: stretch; gap: 6px; padding: 6px; border-radius: calc(var(--hr) + 6px); width: max-content; max-width: calc(100% - 32px); }
+.tools { display: flex; gap: 4px; }
+.tool { position: relative; width: 64px; padding: 8px 2px 6px; gap: 3px; border-radius: var(--hr); border: 1px solid transparent; background: var(--hud-2); color: var(--hud-fg); transition: background .1s, transform .08s; }
+.tool:hover { background: #2f2c27; }
+.tool:active { transform: translateY(1px); }
+.tool svg { width: 26px; height: 26px; }
+.tool .tn { font-size: 12.5px; font-weight: 600; }
+.tool .td { display: none; }
+.tool kbd { position: absolute; top: 3px; left: 5px; color: var(--hud-mute); font-size: 10px; font-variant-numeric: tabular-nums; }
+.tool[aria-checked="true"] { background: var(--hot); border-color: var(--hot); color: #fff; }
+.tool[aria-checked="true"] svg { color: #fff; }
+.tool[aria-checked="true"] kbd { color: rgba(255, 255, 255, .8); }
+.tool[data-tool="nuke"][aria-checked="true"] { background: #e8b70c; border-color: #e8b70c; color: #1a1405; }
+.tool[data-tool="nuke"][aria-checked="true"] svg { color: #1a1405; }
+.tool[data-tool="nuke"][aria-checked="true"] kbd { color: rgba(26, 20, 5, .7); }
+
+.acts { display: flex; gap: 4px; padding-left: 6px; border-left: 1px solid var(--hud-line); }
+.act { flex-direction: column; align-items: center; justify-content: center; gap: 3px; width: 56px; padding: 7px 2px 5px; border: 1px solid transparent; border-radius: var(--hr); background: transparent; color: var(--hud-fg); font-size: 11.5px; font-weight: 500; }
+.act svg { width: 21px; height: 21px; }
+.act kbd { display: none; }
+.act:hover:not(:disabled) { background: var(--hud-2); }
+.act:active:not(:disabled) { transform: translateY(1px); }
+.act:disabled { opacity: .35; }
+#undo:not(:disabled) { background: var(--hud-2); border-color: var(--hud-line); color: var(--hud-fg); }
+#more { display: flex; }
+#more[aria-expanded="true"] { background: var(--hud-2); border-color: var(--hud-fg); }
+
+.toolopt { position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); width: 280px; border-radius: var(--hr); }
+.toolopt output { color: var(--hud-mute); font-variant-numeric: tabular-nums; }
+.toolopt input { accent-color: var(--hot); }
+.opts { position: absolute; right: 6px; bottom: calc(100% + 8px); display: none; flex-direction: column; gap: 2px; min-width: 150px; padding: 4px; border-radius: var(--hr); }
+.dock.open .opts { display: flex; }
+.opt { padding: 7px 10px; border: 0; border-radius: 3px; background: transparent; color: var(--hud-fg); text-align: left; font-size: 13px; }
+.opt:hover { background: var(--hud-2); }
+.opt[aria-pressed="true"]::before { content: "✓ "; color: var(--hot); font-weight: 700; }
+.opt[aria-pressed="false"]::before { content: "　"; }
+.opt[aria-pressed="true"] { background: transparent; border: 0; }
+
+.support-row { flex-direction: column; justify-content: center; gap: 4px; padding-left: 6px; border-left: 1px solid var(--hud-line); }
+.support-row .sup-h { font-size: 10.5px; font-weight: 600; color: var(--hud-mute); text-align: center; }
+.support-row .opt { flex: none; padding: 4px 10px; font-size: 12px; text-align: center; border-radius: 3px; }
+.support-row .opt::before { content: none !important; }
+.opt.support .lg { display: none; }
+.opt.support .sh { display: inline; }
+
+.hud .score { padding: 4px 10px 5px; border-radius: var(--hr); }
+.hud .score b { font-size: 26px; }
+.lb { border-radius: var(--hr); }
+.lb b { color: var(--hot); }
+.compass { right: 16px; bottom: 30px; }
+.compass text { fill: var(--hud-fg); }
+.credit { bottom: 6px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 32px); border: 0; border-radius: 3px; padding: 2px 8px; background: rgba(20, 20, 19, .82); font-size: 10.5px; color: var(--hud-mute); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: none; }
+.depth { top: 16px; bottom: auto; border-radius: var(--hr); }
+.depth:hover { background: var(--hud-2); }
+.depth .lbl { color: var(--hud-mute); }
+#cheer { bottom: 126px; border-radius: var(--hr); }
+#cheer .msg, #cheer .x { color: var(--hud-mute); }
+#cheer .acts a { border-radius: 3px; }
+.label { background: rgba(20, 20, 19, .86); border-radius: 3px; font-weight: 600; }
+
+@media (max-width: 1080px) and (min-width: 721px) {
+  .tool { width: 56px; } .tool svg { width: 23px; height: 23px; } .tool .tn { font-size: 11.5px; }
+  .act { width: 50px; font-size: 10.5px; }
+}
+@media (max-width: 720px) {
+  .titlebar { padding: 4px 4px 4px 10px; }
+  .titlebar h1 { font-size: 15px; }
+  .dock { left: 8px; right: 8px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: none; width: auto; max-width: none; flex-wrap: wrap; gap: 5px; padding: 5px; }
+  .tools { width: 100%; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px; }
+  .tool { width: auto; padding: 7px 0 5px; }
+  .tool svg { width: 22px; height: 22px; }
+  .tool .tn { font-size: 10.5px; }
+  .tool kbd { display: none; }
+  .acts { flex: 1 1 auto; padding-left: 0; border-left: 0; gap: 3px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  #undo { display: none; }   /* phones: one-step undo is left out, 전부 복구 stays */
+  .act { width: auto; padding: 5px 0 4px; font-size: 10px; background: var(--hud-2); }
+  .act svg { width: 18px; height: 18px; }
+  .support-row { flex: none; gap: 3px; padding-left: 5px; }
+  .support-row .sup-h { display: none; }
+  .support-row .opt { padding: 4px 9px; font-size: 11px; }
+  .toolopt { width: calc(100% - 10px); }
+  .credit { left: 8px; right: 8px; transform: none; max-width: none; bottom: calc(2px + env(safe-area-inset-bottom, 0px)); background: none; font-size: 9px; color: rgba(255, 255, 255, .85); text-shadow: 0 1px 2px rgba(0, 0, 0, .7); }
+  .depth { top: calc(var(--title-h, 42px) + 16px + env(safe-area-inset-top, 0px)); }
+  .hud .score b { font-size: 18px; }
+  #cheer { bottom: calc(var(--dock-h, 150px) + 14px); }
+}
 @keyframes fadeOnly { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes fadeBanner { 0%, 85% { opacity: 1; } 100% { opacity: 0; } }
 </style>
@@ -348,10 +447,10 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
         <input type="range" id="quake-mag" min="4" max="10" step="0.5" value="9">
       </div>
       <div class="acts">
-        <button class="act" id="undo" type="button" disabled>되돌리기 <kbd id="undo-key">Ctrl Z</kbd></button>
-        <button class="act" id="reset" type="button" disabled>전부 복구</button>
-        <button class="act" id="share" type="button">공유</button>
-        <button class="act" id="more" type="button" aria-expanded="false" aria-controls="opts" aria-label="설정 더 보기">⋯</button>
+        <button class="act" id="undo" type="button" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><span class="al">되돌리기</span> <kbd id="undo-key">Ctrl Z</kbd></button>
+        <button class="act" id="reset" type="button" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg><span class="al">전부 복구</span></button>
+        <button class="act" id="share" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 8 5-5 5 5"/><path d="M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg><span class="al">공유</span></button>
+        <button class="act" id="more" type="button" aria-expanded="false" aria-controls="opts" aria-label="설정 더 보기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg><span class="al">설정</span></button>
       </div>
       <div class="opts" id="opts">
         <button class="opt" id="t-labels" type="button" aria-pressed="true">이름 표시</button>
@@ -360,9 +459,9 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
         <button class="opt" id="t-top" type="button">위에서 보기</button>
         <button class="opt" id="t-night" type="button" aria-pressed="false">밤</button>
       </div>
-      <div class="support-row" id="support-row" hidden>
-        <a class="opt support kakao" id="t-support-kakao" href="#" target="_blank" rel="noopener" hidden>카카오페이로 응원</a>
-        <a class="opt support toss" id="t-support-toss" href="#" hidden>토스로 응원</a>
+      <div class="support-row" id="support-row" hidden><span class="sup-h" aria-hidden="true">응원</span>
+        <a class="opt support kakao" id="t-support-kakao" href="#" target="_blank" rel="noopener" hidden><span class="lg">카카오페이로 응원</span><span class="sh">카카오페이</span></a>
+        <a class="opt support toss" id="t-support-toss" href="#" hidden><span class="lg">토스로 응원</span><span class="sh">토스</span></a>
         <a class="opt support" id="t-support" href="#" target="_blank" rel="noopener" hidden>☕ Buy Me a Coffee</a>
       </div>
     </div>
@@ -382,7 +481,7 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
   <p id="toast" hidden></p>
   <div id="cheer" role="dialog" aria-label="개발자 응원" hidden>
     <div class="top"><b id="cheer-title"></b><button type="button" class="x" id="cheer-close" aria-label="닫기">&times;</button></div>
-    <p class="msg">작은 후원이 큰 힘이 됩니다!</p>
+    <p class="msg">학부생이 혼자 만드는 게임이에요. 작은 후원이 큰 힘이 됩니다!</p>
     <div class="acts"><a class="kakao" id="cheer-kakao" href="#" target="_blank" rel="noopener">카카오페이로 응원</a><a class="toss" id="cheer-toss" href="#">토스로 응원</a><a class="bmc" id="cheer-bmc" href="#" target="_blank" rel="noopener">Buy Me a Coffee</a></div>
   </div>
   <div id="rewind-fx" aria-hidden="true"><span>◀◀ REWIND</span></div>
@@ -398,7 +497,7 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
         <button class="act" id="share-go" type="button" hidden>다른 앱으로</button>
         <button class="act" id="share-close" type="button">닫기</button>
       </div>
-      <div class="share-cheer" id="share-cheer" hidden><span>작은 후원이 큰 힘이 됩니다!</span><div class="acts"><a class="kakao" id="share-cheer-kakao" href="#" target="_blank" rel="noopener">카카오페이로 응원</a><a class="toss" id="share-cheer-toss" href="#">토스로 응원</a><a class="bmc" id="share-cheer-bmc" href="#" target="_blank" rel="noopener">Buy Me a Coffee</a></div></div>
+      <div class="share-cheer" id="share-cheer" hidden><span>학부생이 혼자 만드는 게임이에요. 작은 후원이 큰 힘이 됩니다!</span><div class="acts"><a class="kakao" id="share-cheer-kakao" href="#" target="_blank" rel="noopener">카카오페이로 응원</a><a class="toss" id="share-cheer-toss" href="#">토스로 응원</a><a class="bmc" id="share-cheer-bmc" href="#" target="_blank" rel="noopener">Buy Me a Coffee</a></div></div>
       <p class="note" id="share-note"></p>
     </div>
   </div>
@@ -3231,18 +3330,20 @@ function updateLabels(force = false) {
     obstaclesAt = labelTick;
     const sr = stage.getBoundingClientRect();
     obstacles = [];
-    document.querySelectorAll('.titlebar, .dock, #hud, #depth:not([hidden])').forEach((el) => {
+    document.querySelectorAll('.titlebar, .dock, .toolopt:not([hidden]), .dock.open .opts, #hud, #depth:not([hidden])').forEach((el) => {
       const r = el.getBoundingClientRect();
       if (r.width && r.height) obstacles.push([r.left - sr.left - 4, r.top - sr.top - 4, r.width + 8, r.height + 8]);
     });
   }
   const placed = obstacles.slice();
+  let shown = 0;
+  const maxShown = w < 720 ? 9 : 16;
   for (const it of items) {
     const { L } = it;
     let on = showAll && L.b.labelOn && it.z < 1 && it.x > -50 && it.x < w + 50 && it.y > 0 && it.y < h + 20;
     const rx = it.x - L.w / 2 - 3, ry = it.y - L.h - 10, rw = L.w + 6, rh = L.h + 4;
-    if (on) on = !placed.some((p) => rx < p[0] + p[2] && p[0] < rx + rw && ry < p[1] + p[3] && p[1] < ry + rh);
-    if (on) placed.push([rx, ry, rw, rh]);
+    if (on) on = shown < maxShown && !placed.some((p) => rx < p[0] + p[2] && p[0] < rx + rw && ry < p[1] + p[3] && p[1] < ry + rh);
+    if (on) { placed.push([rx, ry, rw, rh]); shown++; }
     if (on !== L.on) { L.on = on; L.el.classList.toggle('on', on); }
     if (on) {
       const tf = `translate(${Math.round(it.x - L.w / 2)}px, ${Math.round(it.y - L.h - 7)}px)`;
@@ -3317,7 +3418,7 @@ function setTool(t) {
   reticle.scale.setScalar(TOOLS[t].r);
   $('opt-bat').hidden = t !== 'bat';
   $('opt-quake').hidden = t !== 'quake';
-  obstaclesAt = -99;
+  obstaclesAt = -99; labelKey = '';
 }
 const store = (k, v) => { try { localStorage.setItem(k, String(v)); } catch (e) { /* storage blocked */ } };
 const recall = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
@@ -3702,7 +3803,7 @@ $('more').addEventListener('click', (e) => {
   const open = document.querySelector('.dock').classList.toggle('open');
   appEl.classList.toggle('opts-open', open);
   e.currentTarget.setAttribute('aria-expanded', String(open));
-  obstaclesAt = -99;
+  obstaclesAt = -99; labelKey = '';
 });
 renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
 if (COARSE) {
