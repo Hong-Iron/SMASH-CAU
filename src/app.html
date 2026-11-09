@@ -301,6 +301,9 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
 .tool[data-tool="nuke"][aria-checked="true"] { background: #e8b70c; border-color: #e8b70c; color: #1a1405; }
 .tool[data-tool="nuke"][aria-checked="true"] svg { color: #1a1405; }
 .tool[data-tool="nuke"][aria-checked="true"] kbd { color: rgba(26, 20, 5, .7); }
+.tool[data-tool="pepero"][aria-checked="true"] { background: #e9578a; border-color: #e9578a; color: #fff; }
+.tool .new { position: absolute; top: -6px; right: -4px; padding: 1px 4px 0; border-radius: 3px; background: #e9578a; color: #fff; font: 700 9px/1.35 system-ui, sans-serif; font-style: normal; letter-spacing: .02em; pointer-events: none; }
+.tool[aria-checked="true"] .new, .tool .new[hidden] { display: none; }
 
 .acts { display: flex; gap: 4px; padding-left: 6px; border-left: 1px solid var(--hud-line); }
 .act { flex-direction: column; align-items: center; justify-content: center; gap: 3px; width: 56px; padding: 7px 2px 5px; border: 1px solid transparent; border-radius: var(--hr); background: transparent; color: var(--hud-fg); font-size: 11.5px; font-weight: 500; }
@@ -354,7 +357,7 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
   .titlebar { padding: 4px 4px 4px 10px; }
   .titlebar h1 { font-size: 15px; }
   .dock { left: 8px; right: 8px; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: none; width: auto; max-width: none; flex-wrap: wrap; gap: 5px; padding: 5px; }
-  .tools { width: 100%; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px; }
+  .tools { width: 100%; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
   .tool { width: auto; padding: 7px 0 5px; }
   .tool svg { width: 22px; height: 22px; }
   .tool .tn { font-size: 10.5px; }
@@ -435,11 +438,25 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
           </svg>
           <span class="tn">핵폭탄</span><span class="td">통째로</span><kbd>6</kbd>
         </button>
+        <button class="tool" type="button" role="radio" aria-checked="false" data-tool="pepero">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5.2 2.8 7.9 7.3" stroke-width="1.7" opacity=".72"></path>
+            <path d="M8.5 8.3 15.4 19.8" stroke-width="3.9"></path>
+            <path d="M2.5 21.2h19" stroke-width="1.7"></path>
+            <path d="M12.6 18.6l-1.8-.9M18.4 18.2l1.9-1.1M17.6 15.6l1.2-1.6" stroke-width="1.3"></path>
+          </svg>
+          <span class="tn">빼빼로</span><span class="td">꽂아 뚫음</span><kbd>7</kbd><i class="new" aria-hidden="true">NEW</i>
+        </button>
       </div>
       <div class="toolopt" id="opt-bat" hidden>
         <label for="bat-size">배트 크기</label>
         <output id="bat-size-out" for="bat-size"></output>
         <input type="range" id="bat-size" min="0.5" max="3" step="0.25" value="1">
+      </div>
+      <div class="toolopt" id="opt-pep" hidden>
+        <label for="pep-size">빼빼로 크기</label>
+        <output id="pep-size-out" for="pep-size"></output>
+        <input type="range" id="pep-size" min="0.5" max="3" step="0.25" value="1">
       </div>
       <div class="toolopt" id="opt-quake" hidden>
         <label for="quake-mag">지진 세기</label>
@@ -1976,6 +1993,29 @@ const SFX = {
     noise(c, t + 0.7, 6.5, 'lowpass', 900, 36, 0.85, 0.85);
     crackle(c, t + 0.2, 5.5, 140, 2000, 0.35);
   },
+  javelin(k = 1) {
+    // the stick leaving the hand: an airy whoosh that rises, lower for bigger sticks
+    const c = audio(); if (!c) return; const t = c.currentTime, s = Math.sqrt(k);
+    noise(c, t, 0.55, 'bandpass', 420 / s, 2300 / s, 0.62, 0.2, 1.4);
+    noise(c, t + 0.1, 0.9, 'bandpass', 2400 / s, 800 / s, 0.28, 0.3, 2);
+    tone(c, t, 0.4, 'sine', 160 / s, 380 / s, 0.1, 0.1);
+  },
+  pierce(k = 1, through = false) {
+    // 빠각: a biscuit snap with crunchy crumbs and a heavy thud, then the stuck stick hums (부르르)
+    const c = audio(); if (!c) return; const t = c.currentTime, s = Math.sqrt(k);
+    noise(c, t, 0.05, 'highpass', 6500, 3000, 0.95, 0.2);
+    crackle(c, t + 0.01, 0.22, 16, 3000, 0.55);
+    noise(c, t, 0.4, 'lowpass', 1800, 180, 0.75, 0.35);
+    tone(c, t, 0.5, 'sine', 92 / s, 36 / s, 0.85, 0.15);
+    const f = 118 / s, o = c.createOscillator(), lfo = c.createOscillator(), depth = c.createGain(), am = c.createGain(), g = c.createGain();
+    o.type = 'triangle'; o.frequency.setValueAtTime(f * 1.3, t + 0.05); o.frequency.exponentialRampToValueAtTime(f, t + 0.95);
+    lfo.frequency.value = 24; depth.gain.value = 0.5; am.gain.value = 0.5;
+    lfo.connect(depth).connect(am.gain);
+    g.gain.setValueAtTime(0.0001, t + 0.05); g.gain.linearRampToValueAtTime(0.3, t + 0.07); g.gain.exponentialRampToValueAtTime(0.0001, t + 1);
+    o.connect(am).connect(g); send(c, g, 0.25);
+    o.start(t + 0.05); o.stop(t + 1.05); lfo.start(t + 0.05); lfo.stop(t + 1.05);
+    if (through) { noise(c, t + 0.04, 1.5, 'lowpass', 2400, 90, 0.95, 0.5); tone(c, t, 1.3, 'sine', 64, 24, 0.9, 0.1); crackle(c, t + 0.15, 1.5, 44, 2400, 0.32); }
+  },
   toss() {
     const c = audio(); if (!c) return; const t = c.currentTime;
     noise(c, t, 0.32, 'bandpass', 300, 1600, 0.3, 0.15, 1.1);
@@ -2017,7 +2057,7 @@ function addShake(amount, at) {
 const wobble = (x) => Math.sin(x) * 0.5 + Math.sin(x * 2.31 + 1.7) * 0.3 + Math.sin(x * 4.73 + 0.3) * 0.2;
 
 // ============ tools
-const TOOLS = { bomb: { r: 16 }, bat: { r: 6 }, laser: { r: 1.8 }, meteor: { r: 92 }, quake: { r: 260 }, nuke: { r: 380 } };
+const TOOLS = { bomb: { r: 16 }, bat: { r: 6 }, laser: { r: 1.8 }, meteor: { r: 92 }, quake: { r: 260 }, nuke: { r: 380 }, pepero: { r: 3.4 } };
 let tool = 'bomb';
 const bombs = [];
 const bombGeo = new THREE.SphereGeometry(1.4, 16, 12), bombMat = new THREE.MeshStandardMaterial({ color: 0x1d1f22, roughness: 0.4, metalness: 0.4 });
@@ -2097,6 +2137,288 @@ function explode(c) {
   addShake(0.95, c);
   capPieces();
   endAct();
+}
+// ---- 빼빼로 투창: a giant chocolate-dipped biscuit stick thrown like a javelin; it skewers buildings and stays stuck
+// local frame: the dipped tip at the origin, the stick running back along -z
+const PEP_L = 34, PEP_LC = 25.4, PEP_RC = 0.95, PEP_RB = 0.7;   // length, dipped length, coat and biscuit radius (m) at size ×1
+const PEP_PIERCE = 2;   // from this size up the stick goes right through a building and brings it down
+let pepSize = 1;
+const PEP_FLAVORS = [
+  { k: 'choco', n: '초코', coat: 0x3b1d10, rough: 0.32 },
+  { k: 'almond', n: '아몬드', coat: 0x4a2716, rough: 0.48, bits: 0xd9aa6c, bump: 0.38, nb: 120, w: 0.3 },
+  { k: 'berry', n: '딸기', coat: 0xf47aa6, rough: 0.42, bits: 0xd23c6c, bump: 0.05, nb: 90, w: 0.22 },
+  { k: 'white', n: '화이트', coat: 0xf4ecdd, rough: 0.48, bits: 0x3a2214, bump: 0.06, nb: 110, w: 0.2 },
+];
+const pepGeoCache = {};
+function pepCoatGeo(f) {
+  if (pepGeoCache[f.k]) return pepGeoCache[f.k];
+  let seed = f.k.length * 977 + f.coat % 1000;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const NR = 26, NH = 40, body = PEP_LC - PEP_RC;
+  const cyl = new THREE.CylinderGeometry(PEP_RC, PEP_RC, body, NR, NH, true);
+  cyl.rotateX(Math.PI / 2); cyl.translate(0, 0, -PEP_RC - body / 2);          // z from -PEP_LC to -PEP_RC
+  const cap = new THREE.SphereGeometry(PEP_RC, NR, 10, 0, Math.PI * 2, 0, Math.PI / 2);
+  cap.rotateX(Math.PI / 2); cap.translate(0, 0, -PEP_RC);                    // rounded dipped tip, reaching z = 0
+  const g = mergeGeometries([cyl.toNonIndexed(), cap.toNonIndexed()]);
+  const pos = g.attributes.position, n = pos.count, col = new Float32Array(n * 3);
+  const blobs = [];
+  for (let i = 0; i < (f.nb || 0); i++) blobs.push([rnd() * Math.PI * 2, -PEP_LC + 1.2 + rnd() * (PEP_LC - 2.2), (0.6 + 0.8 * rnd()) * (f.w || 0.4)]);
+  const c0 = new THREE.Color(f.coat), c1 = new THREE.Color(f.bits || f.coat), c = new THREE.Color();
+  for (let i = 0; i < n; i++) {
+    let x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const th = Math.atan2(y, x), rr = Math.hypot(x, y);
+    let s = 0;
+    for (const [bt, bz, bw] of blobs) {
+      let dt = Math.abs(th - bt); dt = Math.min(dt, Math.PI * 2 - dt);
+      const d2 = ((dt * PEP_RC) ** 2 + (z - bz) ** 2) / (bw * bw);
+      if (d2 < 4) s = Math.max(s, Math.exp(-d2));
+    }
+    let r = rr * (1 + (f.bump || 0) * s);
+    const edge = z - -PEP_LC;                                // the dipped edge: a soft wave, tucked in to the biscuit at the very end
+    if (edge < 1.6 && rr > 1e-4) {
+      const w = 1 - edge / 1.6;
+      z += w * (0.32 * Math.sin(3 * th + 0.7) + 0.16 * Math.sin(7 * th + 2.1) + 0.34);
+      if (edge < 0.05) r = PEP_RB * 1.05;
+    }
+    if (rr > 1e-4) { x *= r / rr; y *= r / rr; }
+    pos.setXYZ(i, x, y, z);
+    c.copy(c0).lerp(c1, THREE.MathUtils.smoothstep(s, 0.3, 0.62));
+    col[3 * i] = c.r; col[3 * i + 1] = c.g; col[3 * i + 2] = c.b;
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  return (pepGeoCache[f.k] = g);
+}
+const pepBiscuitGeo = (() => {
+  const len = PEP_L - PEP_LC + 1.4, g = new THREE.CylinderGeometry(PEP_RB, PEP_RB * 0.97, len, 18, 1, false);
+  g.rotateX(Math.PI / 2); g.translate(0, 0, -PEP_L + len / 2);
+  return g;
+})();
+const pepBiscuitMat = new THREE.MeshStandardMaterial({ color: 0xd99d58, roughness: 0.86 });
+const pepCoatMat = {};
+function makePepero(fi) {
+  const f = PEP_FLAVORS[fi % PEP_FLAVORS.length];
+  pepCoatMat[f.k] = pepCoatMat[f.k] || new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: f.rough, metalness: 0 });
+  const grp = new THREE.Group();
+  const coat = new THREE.Mesh(pepCoatGeo(f), pepCoatMat[f.k]), bis = new THREE.Mesh(pepBiscuitGeo, pepBiscuitMat);
+  coat.castShadow = bis.castShadow = true; coat.receiveShadow = bis.receiveShadow = !PHONE;
+  grp.add(coat, bis); grp.userData.flavor = f.k;
+  return grp;
+}
+const pepShown = [];
+const _pz = new THREE.Vector3(0, 0, 1);
+function pepPlace(fi, tip, dir, k = pepSize) {
+  const m = makePepero(fi); m.scale.setScalar(k);
+  m.position.copy(tip); m.quaternion.setFromUnitVectors(_pz, dir.clone().normalize());
+  scene.add(m); pepShown.push(m); shadowDirty = true;
+  return m;
+}
+// thrown sticks: in flight (javs), then stuck in a wall or the ground (peps). From ×PEP_PIERCE up a stick goes
+// right through, carving every building on its line and bringing them down, and plants itself in the ground behind.
+const javs = [], peps = [];
+const MAXPEP = PHONE ? 24 : 48;
+let pepThrown = 0, pepCheckT = 0;
+const _pq = new THREE.Quaternion(), _pa = new THREE.Vector3(), _pb = new THREE.Vector3(), _pc = new THREE.Vector3();
+function pepAim(m, dir, roll) {
+  m.quaternion.setFromUnitVectors(_pz, _pa.copy(dir).normalize());
+  if (roll) m.quaternion.multiply(_pq.setFromAxisAngle(_pz, roll));
+}
+let pepForce = null;   // test/film hook: the flavour of the next throws (null = random)
+function throwPepero(hit, k = pepSize, fi = pepForce ?? Math.floor(Math.random() * PEP_FLAVORS.length), from = null) {
+  const target = hit.point.clone();
+  let start = from;
+  if (!start) {
+    // from just above the top of the screen, so it sails in over the player's head instead of crossing the view up close
+    const look = new THREE.Vector3(); camera.getWorldDirection(look);
+    const right = new THREE.Vector3().crossVectors(look, camera.up).normalize(), upv = new THREE.Vector3().crossVectors(right, look);
+    const lead = Math.min(14 + 0.6 * PEP_L * k, camera.position.distanceTo(target) * 0.45);
+    start = camera.position.clone().addScaledVector(look, lead).addScaledVector(upv, lead * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * 1.15).addScaledVector(right, rand(-0.2, 0.2) * lead);
+  }
+  // a javelin's lob: high enough that it comes down at about 55–60°, so it stands out instead of pointing at the camera
+  const d = start.distanceTo(target), h = Math.hypot(target.x - start.x, target.z - start.z);
+  const arc = Math.min(0.6 * d, Math.max(0.06 * d, (1.5 * h + (target.y - start.y)) / 4));
+  const m = makePepero(fi); m.scale.setScalar(k); m.position.copy(start); scene.add(m);
+  javs.push({ m, k, fi, start: start.clone(), target, arc, t: 0, T: Math.min(1.5, 0.5 + d / 420), roll: 0, spin: rand(5, 9) * (Math.random() < 0.5 ? -1 : 1), dir: new THREE.Vector3() });
+  SFX.javelin(k);
+}
+function updateJavs(dt) {
+  for (let i = javs.length - 1; i >= 0; i--) {
+    const j = javs[i];
+    j.t += dt;
+    const u = Math.min(1, j.t / j.T);
+    j.m.position.lerpVectors(j.start, j.target, u).y += j.arc * 4 * u * (1 - u);
+    j.dir.subVectors(j.target, j.start).y += j.arc * 4 * (1 - 2 * u);
+    j.roll += j.spin * dt;
+    pepAim(j.m, j.dir, j.roll);
+    const tail = _pb.copy(j.dir).normalize().multiplyScalar(-PEP_L * j.k).add(j.m.position);
+    if (Math.random() < 0.6) emit(sparks, tail.x, tail.y, tail.z, rand(-1, 1), rand(-1, 1), rand(-1, 1), rand(0.2, 0.4), 1, 0.86, 0.72, 0.45);
+    shadowDirty = true;
+    if (u >= 1) { javs.splice(i, 1); pepImpact(j); }
+  }
+}
+const pepHalf = (p) => 0.55 * Math.max(p.def.hx, p.def.hy, p.def.hz);
+// carve along the segment a→b: blocks within R are punched out along the stick, within R2 they crack loose and drop
+function pepCarve(a, b, dir, R, R2, k, through) {
+  const ab = new THREE.Vector3().subVectors(b, a), len2 = Math.max(1e-6, ab.lengthSq()), len = Math.sqrt(len2);
+  const near = (pt, out) => out.copy(a).addScaledVector(ab, Math.min(1, Math.max(0, _pc.subVectors(pt, a).dot(ab) / len2)));
+  const step = Math.max(2, R * 0.8), samples = [];
+  for (let t = 0; t <= len + 1e-6; t += step) samples.push(a.clone().addScaledVector(ab, t / len));
+  samples.push(b.clone());
+  const cp = new THREE.Vector3(), touched = [], skewered = [];
+  for (const bd of B) {
+    if (!bd.statics.size || !samples.some((q) => buildingDist(bd, q) < R2)) continue;
+    if (bd.whole) chunkify(bd);
+    let n = 0;
+    for (const p of [...bd.statics]) {
+      const d = p.pos.distanceTo(near(p.pos, cp)) - pepHalf(p);
+      if (d > R2) continue;
+      n++;
+      const f = Math.max(0, 1 - d / R2);
+      const out = new THREE.Vector3().subVectors(p.pos, cp); out.y = 0;
+      if (out.lengthSq() < 1e-4) out.set(rand(-1, 1), 0, rand(-1, 1));
+      out.normalize();
+      const ang = new THREE.Vector3(rand(-4, 4), rand(-4, 4), rand(-4, 4)).multiplyScalar(0.3 + f);
+      if (d < R) {
+        const vel = dir.clone().multiplyScalar(((through ? 26 : 12) + 5 * k) * (0.5 + 0.5 * f)).addScaledVector(out, (6 + 4 * k) * f).add(new THREE.Vector3(rand(-2, 2), rand(1, 6), rand(-2, 2)));
+        const kids = d < R * 0.6 ? splitPiece(p) : null;
+        if (kids) { removePiece(p); for (const kk of kids) { kk.static = false; release(kk, vel.clone().add(new THREE.Vector3(rand(-3, 3), rand(-1, 3), rand(-3, 3))), ang); } }
+        else release(p, vel, ang);
+      } else release(p, out.multiplyScalar(rand(1, 4)).add(new THREE.Vector3(0, -rand(0, 2), 0)), ang.multiplyScalar(0.3));
+    }
+    if (n) { touched.push(bd); if (n >= 3) skewered.push(bd); }
+  }
+  for (const p of dyn) {
+    const d = p.pos.distanceTo(near(p.pos, cp));
+    if (d > R2 * 1.2) continue;
+    if (!p.sleep && p.pos.y - groundY(p.pos.x, p.pos.z) > p.def.rest + 1.5 && curAct) curAct.air++;
+    p.sleep = false; p.still = 0;
+    p.vel.addScaledVector(dir, (10 + 4 * k) * (1 - d / (R2 * 1.2))).y += rand(2, 5);
+  }
+  let gone = 0;
+  for (let i = 0; i < TREES.length; i++) {
+    if (treeHidden[i]) continue;
+    const [x, z] = TREES[i], tp = _pb.set(x, groundY(x, z) + 4, z);
+    if (tp.distanceTo(near(tp, cp)) < R * 1.3) { treeHidden[i] = 1; gone++; }
+  }
+  if (gone) placeTrees();
+  return { touched, skewered };
+}
+function pepImpact(j) {
+  const k = j.k, Lk = PEP_L * k, through = k >= PEP_PIERCE - 1e-6, f = PEP_FLAVORS[j.fi];
+  const dir = j.dir.clone().normalize(), entry = j.target.clone();
+  pepAim(j.m, dir, j.roll);
+  const g0 = rayTerrain(entry.clone().addScaledVector(dir, -1.5), dir);
+  const toGround = g0 === null ? 600 : Math.max(0, g0 - 1.5);
+  const inGround = toGround < 1.5;
+  const reach = through ? toGround : inGround ? 0 : Math.min(0.42 * Lk, toGround);
+  const grounded = through || inGround || reach >= toGround - 0.01;
+  const tipEnd = entry.clone().addScaledVector(dir, reach + (grounded ? 0.2 * Lk : 0));
+  const anchor = grounded ? entry.clone().addScaledVector(dir, toGround) : entry.clone();
+  beginAct('pepero', entry);
+  const R = 2.2 + 1.4 * k, R2 = through ? R * 2.2 : R * 1.35;
+  const { touched, skewered } = pepCarve(entry.clone().addScaledVector(dir, -1.5), entry.clone().addScaledVector(dir, Math.max(reach, 0.5)), dir, R, R2, k, through);
+  let fell = 0;
+  if (through) for (const b of skewered) {
+    // the stick went right through: the ground floor gives way and the whole building comes down
+    for (const pc of [...b.statics]) if (pc.def.level <= 0 || pc.def.mech || (pc.def.level === 1 && Math.random() < 0.6)) {
+      release(pc, new THREE.Vector3(rand(-2, 2), 0, rand(-2, 2)), new THREE.Vector3(rand(-1, 1), rand(-1, 1), rand(-1, 1))); fell++;
+    }
+    const gy = groundY(b.cx, b.cz), spread = Math.max(8, (b.x1 - b.x0) * 0.35);
+    puff(new THREE.Vector3(b.cx, gy + 6, b.cz), 90, spread, 9);
+    for (let i = 0; i < 18; i++) { const s2 = rand(0.3, 0.45); emit(smoke, b.cx + rand(-spread, spread), gy + rand(2, 12), b.cz + rand(-spread, spread), rand(-4, 4), rand(3, 9), rand(-4, 4), rand(3, 6), s2 * 1.15, s2, s2 * 0.85, 0.6); }
+  }
+  for (const b of touched) { fell += support(b); wakeNear(b.x0, b.x1, b.z0, b.z1); rebuildStatic(b); }
+  // chocolate and concrete dust where it went in; a small crater where it meets the ground
+  const cc = new THREE.Color(f.coat);
+  for (let i = 0; i < 10 + 8 * k; i++) emit(dust, entry.x + rand(-1, 1) * k, entry.y + rand(-1, 1) * k, entry.z + rand(-1, 1) * k, -dir.x * rand(2, 8) + rand(-3, 3), rand(1, 6), -dir.z * rand(2, 8) + rand(-3, 3), rand(0.6, 1.3), cc.r, cc.g, cc.b, rand(0.5, 0.8));
+  if (!inGround) puff(entry, 14 + 6 * k, 1.5 * k, 6);
+  if (grounded) {
+    puff(anchor, 18 + 8 * k, 2 * k, 5);
+    if (anchor.y - groundY(anchor.x, anchor.z) < 3) digAt(anchor.x, anchor.z, 2 + 1.2 * k, 0.8 + 0.6 * k);
+  }
+  if (through && skewered.length) { curAct.pre = ['관통!']; if (skewered.length > 1) curAct.pre.push(`꼬치 ×${skewered.length}`); curAct.bonus = 300 * skewered.length; }
+  hitStop = through ? 0.09 : 0.05;
+  addShake(0.3 + 0.2 * k, entry);
+  SFX.pierce(k, through && skewered.length > 0); if (fell > 3) SFX.crumble(Math.min(80, fell));
+  const axis = new THREE.Vector3().crossVectors(dir, Math.abs(dir.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0)).normalize();
+  peps.push({ m: j.m, k, fi: j.fi, state: 'slide', t: 0, T: through ? Math.min(0.3, 0.06 + reach / 600) : 0.07, from: entry, to: tipEnd, dir, anchor, emb: tipEnd.distanceTo(anchor), axis, q0: j.m.quaternion.clone(), vel: new THREE.Vector3() });
+  while (peps.length > MAXPEP) scene.remove(peps.shift().m);
+  if (++pepThrown === 11) banner('빼빼로 ×11', '11월 11일엔 캠퍼스에 꽂는다');
+  capPieces();
+  endAct();
+}
+// does anything still hold a stuck stick? the ground around its tip, or standing blocks along the buried part
+function pepHeld(s) {
+  const tip = s.m.position;
+  if (tip.y < groundY(tip.x, tip.z) - 0.3) return true;
+  const r = 2.2 + 1.4 * s.k + 4;
+  for (const u of [0.15, 0.5, 0.85]) {
+    const q = _pb.copy(tip).addScaledVector(s.dir, -s.emb * u);
+    for (const b of B) {
+      if (!b.statics.size || buildingDist(b, q) > r) continue;
+      for (const p of b.statics) if (p.pos.distanceTo(q) - pepHalf(p) < r) return true;
+    }
+  }
+  return false;
+}
+function pepLay(s) {
+  // lie it flat on the ground along the way it was leaning
+  const fwd = _pa.set(0, 0, 1).applyQuaternion(s.m.quaternion); fwd.y = 0;
+  if (fwd.lengthSq() < 1e-4) fwd.set(1, 0, 0);
+  fwd.normalize();
+  const half = 0.5 * PEP_L * s.k, rr = PEP_RC * s.k;
+  const mid = s.m.position.clone().addScaledVector(fwd, -half);
+  const tip = mid.clone().addScaledVector(fwd, half), tail = mid.clone().addScaledVector(fwd, -half);
+  tip.y = groundY(tip.x, tip.z) + rr; tail.y = groundY(tail.x, tail.z) + rr;
+  s.m.position.copy(tip); s.m.quaternion.setFromUnitVectors(_pz, _pa.subVectors(tip, tail).normalize());
+  s.state = 'down';
+  mid.y = groundY(mid.x, mid.z) + 1;
+  puff(mid, 12 + 6 * s.k, half * 0.5, 4);
+  SFX.thump();
+}
+function updatePeps(dt) {
+  let moving = javs.length > 0;
+  for (const s of peps) {
+    if (s.state === 'stuck' || s.state === 'down') continue;
+    moving = true; s.t += dt;
+    if (s.state === 'slide') {
+      const u = Math.min(1, s.t / s.T);
+      s.m.position.lerpVectors(s.from, s.to, 1 - (1 - u) * (1 - u));
+      if (u >= 1) { s.state = 'quiver'; s.t = 0; }
+    } else if (s.state === 'quiver') {
+      // 부르르: the free end shakes about the point where it went in
+      const a = 0.08 * Math.exp(-4.2 * s.t) * Math.sin(46 * s.t) / Math.sqrt(s.k);
+      _pq.setFromAxisAngle(s.axis, a);
+      s.m.quaternion.copy(_pq).multiply(s.q0);
+      s.m.position.copy(s.to).sub(s.anchor).applyQuaternion(_pq).add(s.anchor);
+      if (s.t > 1.1) { s.m.quaternion.copy(s.q0); s.m.position.copy(s.to); s.state = 'stuck'; }
+    } else if (s.state === 'loose') {
+      // nothing holds it any more: it drops and tips over
+      s.vel.y -= 26 * dt; s.m.position.addScaledVector(s.vel, dt);
+      const fwd = _pa.set(0, 0, 1).applyQuaternion(s.m.quaternion);
+      const flat = _pb.set(fwd.x, 0, fwd.z); if (flat.lengthSq() < 1e-4) flat.set(1, 0, 0);
+      s.m.quaternion.rotateTowards(_pq.setFromUnitVectors(_pz, flat.normalize()), 1.6 * dt);
+      const mid = _pc.copy(fwd).multiplyScalar(-0.5 * PEP_L * s.k).add(s.m.position);
+      if (mid.y < groundY(mid.x, mid.z) + PEP_RC * s.k + 0.3 || s.t > 6) pepLay(s);
+    }
+  }
+  pepCheckT -= dt;
+  if (pepCheckT <= 0) {
+    pepCheckT = 0.4;
+    for (const s of peps) if (s.state === 'stuck' && !pepHeld(s)) { s.state = 'loose'; s.t = 0; s.vel.set(rand(-2, 2), 0, rand(-2, 2)); moving = true; }
+  }
+  if (moving) shadowDirty = true;
+}
+const pepBusy = () => javs.length > 0 || peps.some((s) => s.state !== 'stuck' && s.state !== 'down');
+function pepSnap() {
+  return peps.map((s) => { const rest = s.state === 'slide' || s.state === 'quiver'; return [s, rest ? 'stuck' : s.state, (rest ? s.to : s.m.position).clone(), (rest ? s.q0 : s.m.quaternion).clone()]; });
+}
+function pepRestore(list) {
+  for (const s of peps) scene.remove(s.m);
+  for (const j of javs) scene.remove(j.m);
+  peps.length = 0; javs.length = 0;
+  for (const [s, st, p, q] of list) { s.state = st === 'loose' ? 'stuck' : st; s.t = 0; s.m.position.copy(p); s.m.quaternion.copy(q); scene.add(s.m); peps.push(s); }
+  shadowDirty = true;
 }
 // ---- baseball bat: a giant's swing; blocks fly off, long flights count as home runs
 const batMat = new THREE.MeshStandardMaterial({ color: 0xc8955a, roughness: 0.55 });
@@ -2964,7 +3286,7 @@ function endAct() {
   if (a.vol > 0) pts += 30 * Math.sqrt(a.vol / 50);
   if (a.splits) pts += Math.min(300, 6 * a.splits);
   if (a.dug > 0) pts += 20 * Math.sqrt(a.dug / 20);
-  if (a.tool === 'bomb') a.air = Math.min(a.air, 4);
+  if (a.tool === 'bomb' || a.tool === 'pepero') a.air = Math.min(a.air, 4);
   if (a.air) { pts += 90 * a.air; tags.push(a.air > 1 ? `공중 콤보 ×${a.air}` : '공중 콤보!'); }
   let kills = 0;
   for (const b of B) if (!b.dead && b.statics.size === 0) { b.dead = true; pts += 700; kills++; if (kills <= 2) tags.push(`${b.n || '이름 없는 건물'} 붕괴!`); }
@@ -3117,7 +3439,7 @@ function snapshot() {
   const recs = [];
   for (const p of world) recs.push([p, p.static, p.pos.x, p.pos.y, p.pos.z, p.quat.x, p.quat.y, p.quat.z, p.quat.w, p.vel.x, p.vel.y, p.vel.z, p.ang.x, p.ang.y, p.ang.z, p.sleep]);
   if (elevSnapVer !== elevVer) { elevSnapCopy = elev.slice(); elevSnapVer = elevVer; }
-  return { recs, whole: B.map((b) => b.whole), trees: treeHidden.slice(), elev: elevSnapCopy, elevVer, score, layerMax, centerDone, scorches: scorches.slice() };
+  return { recs, whole: B.map((b) => b.whole), trees: treeHidden.slice(), elev: elevSnapCopy, elevVer, score, layerMax, centerDone, scorches: scorches.slice(), peps: pepSnap() };
 }
 function restore(s) {
   abortCine();
@@ -3141,6 +3463,7 @@ function restore(s) {
   refreshRank(false); updateDepthHud();
   for (const bo of bombs) scene.remove(bo.m);
   bombs.length = 0;
+  pepRestore(s.peps);
   for (const e of fx) { if (e.kind === 'flash') e.obj.intensity = 0; else scene.remove(e.obj); }
   fx.length = 0;
   dust.n = smoke.n = sparks.n = 0;
@@ -3231,6 +3554,7 @@ function strike(hit) {
   if (tool === 'meteor') { const x = hit.point.x, z = hit.point.z; launchMeteor(new THREE.Vector3(x, groundY(x, z), z)); return; }
   if (tool === 'quake') { if (quake) return; const x = hit.point.x, z = hit.point.z; startQuake(new THREE.Vector3(x, groundY(x, z), z)); return; }
   if (tool === 'bomb') { pushHistory(); throwBomb(hit.point.clone().addScaledVector(hit.normal, 1.2)); return; }
+  if (tool === 'pepero') { pushHistory(); throwPepero(hit); return; }
   pushHistory();
   swingBat(hit);
 }
@@ -3410,14 +3734,17 @@ function toast(text) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { el.classList.add('fade'); toastTimer = setTimeout(() => { el.hidden = true; }, 500); }, 2600);
 }
-const TOOL_TIPS = { laser: '끌어서 선을 그으면 그 선을 따라 자릅니다. 톡 누르면 한 점만 태웁니다.', meteor: '누른 곳에 운석이 떨어집니다.', quake: '누른 곳이 진원이 됩니다. 아래 막대로 세기를 고르세요.', bat: '아래 막대로 배트 크기를 고르세요. 70 m 넘게 날리면 홈런입니다.' };
+const TOOL_TIPS = { pepero: '누른 곳에 거대한 빼빼로를 던져 꽂습니다. 아래 막대로 크기를 고르세요. ×2부터는 건물을 꿰뚫고 무너뜨립니다.', laser: '끌어서 선을 그으면 그 선을 따라 자릅니다. 톡 누르면 한 점만 태웁니다.', meteor: '누른 곳에 운석이 떨어집니다.', quake: '누른 곳이 진원이 됩니다. 아래 막대로 세기를 고르세요.', bat: '아래 막대로 배트 크기를 고르세요. 70 m 넘게 날리면 홈런입니다.' };
+const pepNew = document.querySelector('.tool[data-tool="pepero"] .new');
 function setTool(t) {
   if (t !== tool && TOOL_TIPS[t]) toast(TOOL_TIPS[t]);
+  if (t === 'pepero' && pepNew && !pepNew.hidden) { pepNew.hidden = true; store('smash-pep-seen', 1); }
   tool = t;
   document.querySelectorAll('.tool').forEach((el) => el.setAttribute('aria-checked', String(el.dataset.tool === t)));
   reticle.scale.setScalar(TOOLS[t].r);
   $('opt-bat').hidden = t !== 'bat';
   $('opt-quake').hidden = t !== 'quake';
+  $('opt-pep').hidden = t !== 'pepero';
   obstaclesAt = -99; labelKey = '';
 }
 const store = (k, v) => { try { localStorage.setItem(k, String(v)); } catch (e) { /* storage blocked */ } };
@@ -3436,6 +3763,16 @@ function setQuakeMag(M) {
 }
 $('bat-size').addEventListener('input', (e) => { setBatSize(parseFloat(e.target.value)); store('smash-bat', batSize); });
 $('quake-mag').addEventListener('input', (e) => { setQuakeMag(parseFloat(e.target.value)); store('smash-quake', quakeMag); });
+function setPepSize(k) {
+  pepSize = Math.min(3, Math.max(0.5, k));
+  TOOLS.pepero.r = 3.4 * pepSize;
+  if (tool === 'pepero') reticle.scale.setScalar(TOOLS.pepero.r);
+  $('pep-size').value = String(pepSize);
+  $('pep-size-out').textContent = `×${pepSize.toFixed(2).replace(/\.?0+$/, '')} · 길이 ${Math.round(PEP_L * pepSize)} m${pepSize >= PEP_PIERCE ? ' · 관통' : ''}`;
+}
+$('pep-size').addEventListener('input', (e) => { setPepSize(parseFloat(e.target.value)); store('smash-pep', pepSize); });
+setPepSize(parseFloat(recall('smash-pep')) || 1);
+if (pepNew && recall('smash-pep-seen')) pepNew.hidden = true;
 setBatSize(parseFloat(recall('smash-bat')) || 1);
 setQuakeMag(parseFloat(recall('smash-quake')) || 9);
 document.querySelectorAll('.tool').forEach((el) => el.addEventListener('click', () => setTool(el.dataset.tool)));
@@ -3830,7 +4167,7 @@ addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !$('share-modal').hidden) { closeShare(); return; }
   if (e.key === 'Escape' && cine) { endCine(); return; }
   if (e.key === 'n' || e.key === 'N') { setNight(!night); store('smash-night', night ? 1 : 0); return; }
-  const keys = { 1: 'bomb', 2: 'bat', 3: 'laser', 4: 'meteor', 5: 'quake', 6: 'nuke' };
+  const keys = { 1: 'bomb', 2: 'bat', 3: 'laser', 4: 'meteor', 5: 'quake', 6: 'nuke', 7: 'pepero' };
   if (keys[e.key]) setTool(keys[e.key]);
 });
 function syncReticleColor() { reticle.material.color.set(getComputedStyle(root).getPropertyValue('--ring').trim() || '#ff6a2b'); }
@@ -3897,7 +4234,7 @@ let camFov = 0, lastDraw = 0, kickUntil = 0, lockDraw = false;
 const kick = (ms = 700) => { kickUntil = Math.max(kickUntil, performance.now() + ms); };
 for (const ev of ['pointerdown', 'pointermove', 'pointerup', 'wheel', 'keydown', 'touchstart', 'touchmove']) addEventListener(ev, () => kick(), { passive: true, capture: true });
 function sceneBusy(now) {
-  if (bombs.length || fx.length || swings.length || quake || laserBeam || laserDraw || cine || rewind || anim || shockAt) return true;
+  if (bombs.length || fx.length || swings.length || quake || laserBeam || laserDraw || cine || rewind || anim || shockAt || pepBusy()) return true;
   if (trauma > 0.001 || hitStop > 0 || expoBoost > 0 || expoDip > 0 || fogHeat > 0 || glowBase > 0 || maxDig > 60) return true;
   if (dust.n || smoke.n || sparks.n) return true;
   for (const p of dyn) if (!p.sleep) return true;
@@ -3911,6 +4248,7 @@ function simulate(rdt, now) {
   if (hitStop > 0) hitStop -= rdt;
   step(dt / 2); step(dt / 2);
   updateBombs(dt);
+  updateJavs(dt); updatePeps(dt);
   if (laserBeam) updateLaser(dt);
   if (quake) updateQuake(dt);
   updateSwings(dt);
@@ -3998,11 +4336,11 @@ window.__cau = {
   laserPath(pts) { fireLaser(pts.map(([x, z]) => new THREE.Vector3(x, groundY(x, z), z))); },
   meteorAt(x, z) { launchMeteor(new THREE.Vector3(x, groundY(x, z), z)); },
   setBat(k) { setBatSize(k); },
-  async renderSfx(name, arg, sec = 1.6) {
+  async renderSfx(name, arg, sec = 1.6, arg2) {
     const sr = 44100, off = new OfflineAudioContext(2, Math.round(sr * sec), sr);
     const keep = [master, verb, noiseBuf];
     buildBus(off); sfxOverride = off;
-    try { SFX[name](arg); } finally { sfxOverride = null; }
+    try { SFX[name](arg, arg2); } finally { sfxOverride = null; }
     const buf = await off.startRendering();
     [master, verb, noiseBuf] = keep;
     const n = buf.length, out = new DataView(new ArrayBuffer(44 + n * 4));
@@ -4026,6 +4364,22 @@ window.__cau = {
     strike(pickAt(r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height));
   },
   bombAt(x, z) { pushHistory(); throwBomb(new THREE.Vector3(x, groundY(x, z) + 1.2, z)); },
+  pepShow(items) { for (const [fi, x, y, z, dx, dy, dz, k] of items) pepPlace(fi, new THREE.Vector3(x, y === null ? groundY(x, z) : y, z), new THREE.Vector3(dx, dy, dz), k || pepSize); return pepShown.length; },
+  setPep: (k) => setPepSize(k),
+  pepFlavor: (fi) => { pepForce = fi; },
+  pepAt(x, z, y, k, fi, from) { pushHistory(); throwPepero({ point: new THREE.Vector3(x, y == null ? groundY(x, z) : y, z) }, k || pepSize, fi ?? Math.floor(Math.random() * 4), from ? new THREE.Vector3(...from) : null); return javs.length; },
+  pepState: () => ({ javs: javs.length, peps: peps.map((s) => s.state), thrown: pepThrown, busy: pepBusy(), tips: peps.map((s) => s.m.position.toArray().map(Math.round)) }),
+  pepDebug: () => pepShown.map((m) => ({ p: m.position.toArray().map((v) => +v.toFixed(1)), g: +groundY(m.position.x, m.position.z).toFixed(1), s: m.scale.x })),
+  pepClear() { for (const m of pepShown) scene.remove(m); pepShown.length = 0; shadowDirty = true; },
+  groundAt: (x, z) => groundY(x, z),
+  pepThrow(fi, o, t, depth) {
+    const O = new THREE.Vector3(...o), D = new THREE.Vector3(...t).sub(O).normalize();
+    const r = new THREE.Raycaster(O, D); const h = r.intersectObjects(targets(), false)[0];
+    const tt = rayTerrain(O, D); let d = h ? h.distance : Infinity; if (tt !== null && tt < d) d = tt;
+    if (!isFinite(d)) return null;
+    const tip = O.clone().addScaledVector(D, d + depth); pepPlace(fi, tip, D); return tip.toArray().map(Math.round);
+  },
+  setTool: (t) => setTool(t),
   deep: () => ({ x: deepX, z: deepZ, d: maxDig, gy: groundY(deepX, deepZ), score, style, rank: rankIdx, layer: layerMax, center: centerDone }),
   freeze(v) { frozen = !!v; },
   bombsAt: () => bombs.map((bo) => { const v = bo.m.position.clone().project(camera); return { p: bo.m.position.toArray().map(Math.round), start: bo.start.toArray().map(Math.round), t: +bo.t.toFixed(2), T: +bo.T.toFixed(2), sx: Math.round((v.x + 1) / 2 * stage.clientWidth), sy: Math.round((1 - v.y) / 2 * stage.clientHeight), z: +v.z.toFixed(3), inScene: !!bo.m.parent }; }),

@@ -14,7 +14,7 @@ school = cfg.get("school") or cfg["title"]
 campus = cfg.get("campusName") or school
 page_title = f"{school} 부수기 게임 | {campus} 3D | {cfg['title']}"
 desc = (cfg["description"] + ("입니다." if cfg["description"].endswith("게임") else ".")
-        + " 폭탄, 야구 배트, 레이저, 운석, 지진, 핵폭탄으로 건물을 무너뜨리고, 설치 없이 휴대폰과 PC 브라우저에서 무료로 할 수 있습니다.")
+        + " 폭탄, 야구 배트, 레이저, 운석, 지진, 핵폭탄, 빼빼로 투창으로 건물을 무너뜨리고, 설치 없이 휴대폰과 PC 브라우저에서 무료로 할 수 있습니다.")
 page = (tpl.replace("__CAU_DATA__", blob).replace("__PAGE_TITLE__", html.escape(page_title))
         .replace("__TITLE__", html.escape(cfg["title"])).replace("__INTRO__", html.escape(desc)))
 head, rest = page.split('<div id="app">', 1)
