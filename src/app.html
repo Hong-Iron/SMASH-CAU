@@ -1,4 +1,53 @@
 <title>__PAGE_TITLE__</title>
+<meta name="smash-engine" content="2026.11-a">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<!-- the import map has to come before the first module is requested (the preload links below), or the browser ignores it -->
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+  "postprocessing": "./pp-stub.js"
+} }
+</script>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js">
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js">
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/objects/Sky.js">
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/utils/BufferGeometryUtils.js">
+<script>
+// Load log: runs before anything else, so a visit that leaves while the game is still loading is counted too.
+// Events wait in a queue until the visit counter (GoatCounter) has loaded; each name is sent once per page.
+(function () {
+  var q = [], sent = {}, n = 0;
+  var S = window.__smash = { t0: Date.now(), stage: 'lib', version: '2026.11-a', inapp: '', ev: ev, fail: fail };
+  function flush() {
+    var g = window.goatcounter; if (!g || !g.count) return false;
+    while (q.length) { try { g.count({ path: q.shift(), title: location.pathname, event: true }); } catch (e) { /* blocked */ } }
+    return true;
+  }
+  function ev(path) { if (sent[path]) return; sent[path] = 1; q.push(path); flush(); }
+  var iv = setInterval(function () { flush(); if (++n > 200) clearInterval(iv); }, 300);
+  // a load that cannot go on: say so, offer a reload, count the reason
+  function fail(msg, reason) {
+    var m = document.getElementById('load-msg'), b = document.getElementById('load-retry'), l = document.getElementById('loading');
+    if (m) m.textContent = msg; if (b) b.hidden = false; if (l) l.hidden = false;
+    if (reason) ev('load-fail-' + reason);
+  }
+  // in-app browsers (a link opened inside another app): saving and sharing often work differently there
+  var ua = navigator.userAgent || '';
+  S.inapp = /KAKAOTALK/i.test(ua) ? 'kakao' : /Instagram/i.test(ua) ? 'insta' : /FBAN|FBAV|FB_IAB/.test(ua) ? 'fb'
+    : /everytime/i.test(ua) ? 'everytime' : /NAVER\(inapp/i.test(ua) ? 'naver' : /Twitter/i.test(ua) ? 'x' : /\bLine\//i.test(ua) ? 'line'
+    : /iPhone|iPad|iPod/.test(ua) && !/Safari\//.test(ua) ? 'ios-webview' : /Android/.test(ua) && /; wv\)/.test(ua) ? 'android-webview' : '';
+  ev('load-start');
+  if (S.inapp) ev('inapp-' + S.inapp);
+  addEventListener('error', function (e) {
+    if (S.stage === 'ready') { ev('err-js'); return; }
+    if (S.stage === 'failed') return;
+    if (e && e.message) fail('게임을 불러오다 문제가 생겼습니다. 새로고침해 주세요.', 'error');   // script errors only (resource errors carry no message)
+  });
+  addEventListener('unhandledrejection', function () { if (S.stage === 'ready') ev('err-js'); });
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
@@ -107,12 +156,17 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
 #share-modal h2 { margin: 0; font-size: 15px; font-weight: 600; }
 #share-modal img { display: block; width: 100%; height: auto; border-radius: 8px; background: #0b0d12; }
 #share-modal .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-#share-modal .row .act { text-decoration: none; color: inherit; }
+/* the sheet is a light or dark surface of its own: its buttons take the sheet's colours, not the dark dock's (on phones in light mode they were dark text on a dark button) */
+#share-modal .row .act { text-decoration: none; width: auto; padding: 9px 8px; font-size: 13.5px; color: var(--fg); background: var(--surface); border-color: var(--line); }
 #share-modal .row svg { width: 18px; height: 18px; flex: none; }
 #share-modal .row .act { align-items: center; gap: 6px; }
 #share-kakao { background: #fee500 !important; border-color: #e0c800 !important; color: #191919 !important; font-weight: 600; }
 #share-insta { background: linear-gradient(45deg, #f9ce34, #ee2a7b 45%, #6228d7) !important; border-color: transparent !important; color: #fff !important; font-weight: 600; }
 #share-modal .note { margin: 0; font-size: 12px; color: var(--muted); }
+#share-img { -webkit-touch-callout: default; -webkit-user-select: auto; user-select: auto; }   /* long press → save image (the rest of the app turns this off) */
+#share-modal .inapp { display: grid; gap: 8px; margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--hover); font-size: 13px; line-height: 1.5; color: var(--fg); }
+#share-modal .inapp[hidden] { display: none; }
+#share-modal .inapp a { justify-self: start; padding: 7px 14px; border-radius: 8px; background: var(--accent); color: var(--on-accent); font-weight: 600; text-decoration: none; }
 #toast { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); z-index: 80; max-width: calc(100% - 40px); margin: 0; padding: 8px 14px; border-radius: 10px; background: rgba(12, 14, 18, .82); color: #fff; font: 600 13px/1.5 var(--font-ui); text-align: center; pointer-events: none; transition: opacity .5s; }
 #toast.fade { opacity: 0; }
 /* support: a one-time card at a big moment, and a line in the share window */
@@ -168,6 +222,8 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
 .overlay p { max-width: 36ch; margin: 0; }
 .overlay .intro { display: grid; justify-items: center; gap: 10px; }
 .overlay .about { max-width: 44ch; font-size: 13px; line-height: 1.6; }
+.overlay button { margin-top: 6px; padding: 10px 20px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--fg); font: 600 15px var(--font-ui); cursor: pointer; }
+.overlay[hidden] { display: none; }
 
 /* style rank HUD: a game overlay with its own fixed colours, readable over the bright sky */
 .hud { position: absolute; top: 16px; right: 16px; width: 260px; display: grid; justify-items: end; gap: 4px; pointer-events: none; text-align: right; }
@@ -506,6 +562,7 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
     <div class="sheet">
       <h2 id="share-title">이번 판 결과 카드</h2>
       <img id="share-img" alt="부순 캠퍼스 화면과 점수, 랭크, 파괴율이 담긴 결과 카드">
+      <div class="inapp" id="share-inapp" hidden><span id="share-inapp-text"></span><a id="share-inapp-go" href="#" hidden>브라우저로 열기</a></div>
       <div class="row">
         <button class="act" id="share-kakao" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3.5c-5 0-9 3.1-9 7 0 2.5 1.7 4.7 4.2 5.9l-.9 3.4c-.1.3.3.6.6.4l4-2.6c.4 0 .7.1 1.1.1 5 0 9-3.1 9-7s-4-7.2-9-7.2z"/></svg>카카오톡</button>
         <button class="act" id="share-insta" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17.4" cy="6.6" r="1.3" fill="currentColor"/></svg>인스타그램</button>
@@ -534,33 +591,39 @@ kbd { font: 500 10.5px var(--font-data); color: var(--muted); }
   <div id="whiteout"></div>
   <p id="skip">누르거나 Esc를 누르면 건너뜁니다</p>
 
-  <div class="overlay" id="loading"><div class="intro"><p>3D 장면을 만드는 중입니다…</p><p class="about">__INTRO__</p><noscript><p>이 게임은 JavaScript를 켜야 할 수 있습니다.</p></noscript></div></div>
+  <div class="overlay" id="loading"><div class="intro"><p id="load-msg">게임을 불러오는 중입니다…</p><p class="about">__INTRO__</p><button type="button" id="load-retry" onclick="location.reload()" hidden>새로고침</button><noscript><p>이 게임은 JavaScript를 켜야 할 수 있습니다.</p></noscript></div></div>
 </div>
 
 <script type="application/json" id="cau-data">__CAU_DATA__</script>
 <script>
+  // slow load: after 8 s say it is still going; after 20 s offer a reload (the game still starts if the files arrive later)
   setTimeout(function () {
-    if (!window.__cauReady) {
-      var el = document.getElementById('loading');
-      if (el) el.innerHTML = '<p>3D 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인한 뒤 새로고침해 주세요.</p>';
-    }
-  }, 15000);
+    var m = document.getElementById('load-msg');
+    if (!window.__cauReady && m && document.getElementById('load-retry').hidden) m.textContent = '조금 더 걸리고 있습니다. 연결이 느리면 20초쯤 걸릴 수 있어요.';
+  }, 8000);
+  setTimeout(function () {
+    if (!window.__cauReady && document.getElementById('load-retry').hidden)
+      window.__smash.fail('아직 불러오는 중입니다. 계속 그대로면 인터넷 연결을 확인한 뒤 새로고침해 주세요.', window.__smash.stage === 'lib' ? 'slow-lib' : 'slow-build');
+  }, 20000);
 </script>
-<script type="importmap">
-{ "imports": {
-  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-  "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-  "postprocessing": "./pp-stub.js"
-} }
-</script>
-<script type="module">
+<script type="module" id="game">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 
+const SM = window.__smash;
+SM.stage = 'build';
 const D = JSON.parse(document.getElementById('cau-data').textContent);
+// heights may come as differences from the neighbours (dd: value − left − up + upper-left), which compresses to under a third
+if (D.terrain.dd && !D.terrain.dm) {
+  const t = D.terrain, a = t.dd, nx = t.nx, dm = new Array(a.length);
+  for (let k = 0; k < a.length; k++) {
+    const j = k % nx, up = k >= nx;
+    dm[k] = a[k] + (j && up ? dm[k - 1] + dm[k - nx] - dm[k - nx - 1] : j ? dm[k - 1] : up ? dm[k - nx] : 0);
+  }
+  t.dm = dm; delete t.dd;
+}
 // keep only a thin band of ground around the campus, so the campus does not sit on a wide empty block
 {
   const t = D.terrain, M = 26;
@@ -622,7 +685,9 @@ let renderer;
 try {
   renderer = new THREE.WebGLRenderer({ antialias: !(COARSE && devicePixelRatio >= 2), powerPreference: 'high-performance' });
 } catch (err) {
-  $('loading').innerHTML = '<p>이 브라우저에서 WebGL을 쓸 수 없어 3D 지도를 그리지 못했습니다.</p>';
+  SM.stage = 'failed';
+  SM.fail('이 브라우저에서는 3D 그래픽(WebGL)을 쓸 수 없어 게임을 열지 못했습니다. Safari나 Chrome에서 열어 주세요.', 'webgl');
+  $('load-retry').hidden = true;
   throw err;
 }
 renderer.setPixelRatio(pixelRatio);
@@ -634,6 +699,7 @@ renderer.shadowMap.type = COARSE ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 renderer.shadowMap.autoUpdate = false;
 let shadowDirty = true;
 stage.appendChild(renderer.domElement);
+renderer.domElement.addEventListener('webglcontextlost', () => SM.ev('gl-lost'));
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(38, 1, 1, 7000 * SCALE);
@@ -3705,7 +3771,7 @@ const VIEW_DIR = (() => {
   return new THREE.Vector3(dx, 0, dz);
 })();
 function homeView(instant = false) {
-  const aspect = stage.clientWidth / Math.max(1, stage.clientHeight);
+  const aspect = stage.clientWidth > 0 && stage.clientHeight > 0 ? stage.clientWidth / stage.clientHeight : 0.5;   // no size yet: frame as a phone
   const portrait = aspect < 1;
   const tanH = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * aspect;
   const dist = portrait ? Math.max(0.6 * FB.diag, 0.31 * FB.diag / tanH) : 0.8 * FB.diag;
@@ -4010,6 +4076,16 @@ async function openShare() {
     $('share-copy').onclick = async () => {
       toast((await copyText(text)) ? '문구와 링크를 복사했습니다.' : '복사하지 못했습니다. 주소창의 링크를 직접 복사해 주세요.');
     };
+    if (SM.inapp) {
+      // inside another app's browser the save button and the share sheet may do nothing: point to the long press and to the real browser
+      const ios = /iPhone|iPad|iPod/.test(navigator.userAgent), here = CFG.url || location.href;
+      const out = SM.inapp === 'kakao' ? 'kakaotalk://web/openExternal?url=' + encodeURIComponent(here)
+        : !ios ? 'intent://' + here.replace(/^https?:\/\//, '') + '#Intent;scheme=https;end' : '';
+      $('share-inapp-text').textContent = '앱 안에서 연 화면이라 저장이나 공유가 안 될 수 있어요. 카드 그림을 길게 눌러 저장하거나, '
+        + (out ? '아래 버튼으로 브라우저에서 열어 주세요.' : '화면의 ⋯ 또는 공유 메뉴에서 ‘Safari로 열기’를 눌러 주세요.');
+      const go = $('share-inapp-go'); go.hidden = !out; if (out) go.href = out;
+      $('share-inapp').hidden = false;
+    }
     $('share-modal').hidden = false;
   } finally { shareBusy = false; }
 }
@@ -4017,13 +4093,14 @@ const closeShare = () => { $('share-modal').hidden = true; };
 $('share').addEventListener('click', openShare);
 $('share-close').addEventListener('click', closeShare);
 $('share-modal').addEventListener('click', (e) => { if (e.target.id === 'share-modal') closeShare(); });
+if (CFG.hub === 'https://hong-iron.github.io/SMASH/') CFG.hub = 'https://smash-univ.app/';   // the hub moved; older config files still hold the old address
 if (CFG.hub) { const h = $('hub-link'); h.href = CFG.hub; h.hidden = false; }
 
 // ---- visit counter events (GoatCounter, no cookies): only share, support and hub clicks, never per weapon
 function gcEvent(path) {
   try { const g = window.goatcounter; if (g && g.count) g.count({ path, title: CFG.code || '', event: true }); } catch (e) { /* blocked by the browser */ }
 }
-[['share', 'share-open'], ['share-kakao', 'share-kakao'], ['share-insta', 'share-insta'], ['share-save', 'share-save'], ['share-copy', 'share-copy'],
+[['share-inapp-go', 'inapp-open-browser'], ['share', 'share-open'], ['share-kakao', 'share-kakao'], ['share-insta', 'share-insta'], ['share-save', 'share-save'], ['share-copy', 'share-copy'],
   ['t-support-kakao', 'support-kakaopay'], ['t-support-toss', 'support-toss'], ['t-support', 'support-bmc'], ['hub-link', 'hub-link'], ['x-link', 'x-link'], ['lb', 'rank-link']]
   .forEach(([id, path]) => { const el = $(id); if (el) el.addEventListener('click', () => gcEvent(path)); });
 [['cheer-kakao', 'cheer-kakaopay'], ['cheer-bmc', 'cheer-bmc'], ['share-cheer-kakao', 'share-cheer-kakaopay'], ['share-cheer-bmc', 'share-cheer-bmc'],
@@ -4050,15 +4127,12 @@ const LB_SEND_EVERY = 180000, LB_FETCH_EVERY = 300000, LB_TIMEOUT = 8000;
 const trim0 = (v, d) => v.toFixed(d).replace(/\.0$/, '');
 const fmtPts = (n) => (n >= 1e8 ? `${trim0(n / 1e8, n >= 1e9 ? 0 : 1)}억` : n >= 1e4 ? `${trim0(n / 1e4, n >= 1e5 ? 0 : 1)}만` : Math.round(n).toLocaleString('ko-KR'));
 const shortName = (n) => (n || '').replace('대학교', '대').replace(/ 캠퍼스$/, '');
-function lbHeaders(json) {
-  const h = { apikey: LB.key };
-  if (/^eyJ/.test(LB.key)) h.Authorization = `Bearer ${LB.key}`; // legacy anon keys are JWTs; new publishable keys go in apikey only
-  if (json) h['Content-Type'] = 'application/json';
-  return h;
-}
-// the server keeps at most 500,000 points per send, so big bursts go out early in 400,000-point pieces
-const LB_CHUNK = 400000, LB_SOON = 300000;
+// no request headers: the ranking server (Cloudflare Worker) does not read a key, and a header or a JSON content type
+// makes the browser send an extra preflight (OPTIONS) request before every call. The body goes as plain text holding JSON
+// the server takes up to 2,000,000 points per send; a usual run (about 1.2 million) goes out in one send on the 3-minute timer or when leaving
+const LB_CHUNK = 2000000, LB_SOON = 1500000;
 function lbAdd(pts, kills) {
+  if (pts > 0) SM.ev('first-hit');
   if (!LB || !(pts > 0)) return;
   lbPend.score += pts; lbPend.kills += kills || 0;
   showRank();
@@ -4075,7 +4149,7 @@ function lbSend(leaving) {
   lbPend.score = Math.max(0, lbPend.score - sent.score); lbPend.kills = 0; lbFirst = false;
   if (!leaving) lbBusy = true;
   fetch(`${LB.url}/rest/v1/rpc/smash_add`, {
-    method: 'POST', headers: lbHeaders(true), keepalive: !!leaving,
+    method: 'POST', keepalive: !!leaving,
     body: JSON.stringify({ p_code: CFG.code, p_score: sent.score, p_kills: sent.kills, p_new: first }),
   }).then((r) => {
     if (!r.ok) throw new Error(r.status);
@@ -4091,7 +4165,7 @@ async function lbFetch(force) {
   try {
     const ctl = window.AbortController ? new AbortController() : null;
     if (ctl) setTimeout(() => ctl.abort(), LB_TIMEOUT);
-    const r = await fetch(`${LB.url}/rest/v1/rpc/smash_board`, { headers: lbHeaders(false), signal: ctl ? ctl.signal : undefined });
+    const r = await fetch(`${LB.url}/rest/v1/rpc/smash_board`, { signal: ctl ? ctl.signal : undefined });
     if (!r.ok) throw new Error(r.status);
     const rows = await r.json();
     if (Array.isArray(rows)) { lbBoard = rows; lbMine = 0; showRank(); }
@@ -4158,7 +4232,9 @@ $('t-home').addEventListener('click', () => homeView());
 $('t-top').addEventListener('click', topView);
 $('compass').addEventListener('click', northUp);
 $('t-labels').addEventListener('click', (e) => { showAll = !showAll; e.currentTarget.setAttribute('aria-pressed', String(showAll)); });
-$('t-sound').addEventListener('click', (e) => { soundOn = !soundOn; e.currentTarget.setAttribute('aria-pressed', String(soundOn)); });
+if (recall('smash-sound') === '0') { soundOn = false; $('t-sound').setAttribute('aria-pressed', 'false'); }
+$('t-sound').addEventListener('click', (e) => { soundOn = !soundOn; e.currentTarget.setAttribute('aria-pressed', String(soundOn)); store('smash-sound', soundOn ? 1 : 0); if (soundOn) audio(); });
+addEventListener('pointerdown', () => audio(), { once: true, capture: true });
 const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 $('undo-key').textContent = isMac ? '⌘Z' : 'Ctrl Z';
 addEventListener('keydown', (e) => {
@@ -4184,6 +4260,8 @@ function resize() {
   camera.fov = camera.aspect < 1 ? 52 : 38;
   camera.updateProjectionMatrix();
   labelKey = ''; obstaclesAt = -99;
+  // a page opened with no size framed the view at width 0 → camera at Infinity/NaN and an empty screen: frame it again
+  if (w > 0 && h > 0 && !(Number.isFinite(camera.position.x) && Number.isFinite(camera.position.y) && Number.isFinite(camera.position.z))) homeView(true);
 }
 new ResizeObserver(resize).observe(stage);
 
@@ -4324,6 +4402,7 @@ measure();
 if (document.fonts) document.fonts.ready.then(measure);
 syncButtons();
 window.__cau = {
+  version: SM.version,
   strikeAt(name, t) {
     const b = B.find((x) => x.n === name); if (!b) return false;
     setTool(t);
@@ -4418,5 +4497,13 @@ window.__cau = {
 };
 window.__cauReady = true;
 $('loading').hidden = true;
+SM.stage = 'ready';
+// one event carries both "ready" and how long it took (under 2, 4, 8, 15 seconds, or more), to keep the number of counter hits down
+{ const s = (Date.now() - SM.t0) / 1000; SM.ev('load-ready-' + (s < 2 ? '2s' : s < 4 ? '4s' : s < 8 ? '8s' : s < 15 ? '15s' : 'over15s')); }
 requestAnimationFrame(frame);
+</script>
+<script>
+  document.getElementById('game').addEventListener('error', function () {
+    window.__smash.fail('3D 프로그램을 받지 못했습니다. 인터넷 연결을 확인한 뒤 새로고침해 주세요.', 'lib');
+  });
 </script>

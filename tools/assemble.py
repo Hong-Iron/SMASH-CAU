@@ -7,6 +7,14 @@ cfg = json.loads((root / "config.json").read_text(encoding="utf-8"))
 tpl = (root / "src" / "app.html").read_text(encoding="utf-8")
 data = json.loads((root / "data" / "campus.json").read_text(encoding="utf-8"))
 data["config"] = cfg
+# terrain heights go out as differences from the neighbours (value − left − up + upper-left): the same numbers, under a third of the size once compressed.
+# The game adds them back up (app.html, "D.terrain.dd")
+_t = data["terrain"]
+if "dm" in _t:
+    _nx, _dm = _t["nx"], _t["dm"]
+    _t["dd"] = [v - ((_dm[k - 1] + _dm[k - _nx] - _dm[k - _nx - 1]) if (k % _nx and k >= _nx) else _dm[k - 1] if k % _nx else _dm[k - _nx] if k >= _nx else 0)
+                for k, v in enumerate(_dm)]
+    del _t["dm"]
 blob = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
 assert all(k in tpl for k in ("__CAU_DATA__", "__TITLE__", "__PAGE_TITLE__", "__INTRO__"))
 # search: a title people would type ("○○대 부수기 게임"), a fuller description and the same text visible while loading
