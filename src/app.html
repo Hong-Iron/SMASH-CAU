@@ -1,5 +1,5 @@
 <title>__PAGE_TITLE__</title>
-<meta name="smash-engine" content="2026.11-a">
+<meta name="smash-engine" content="2026.11-xmas">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <!-- the import map has to come before the first module is requested (the preload links below), or the browser ignores it -->
 <script type="importmap">
@@ -19,7 +19,7 @@
 // Events wait in a queue until the visit counter (GoatCounter) has loaded; each name is sent once per page.
 (function () {
   var q = [], sent = {}, n = 0;
-  var S = window.__smash = { t0: Date.now(), stage: 'lib', version: '2026.11-a', inapp: '', ev: ev, fail: fail };
+  var S = window.__smash = { t0: Date.now(), stage: 'lib', version: '2026.11-xmas', inapp: '', ev: ev, fail: fail };
   function flush() {
     var g = window.goatcounter; if (!g || !g.count) return false;
     while (q.length) { try { g.count({ path: q.shift(), title: location.pathname, event: true }); } catch (e) { /* blocked */ } }
@@ -679,6 +679,7 @@ const PHONE = COARSE && Math.min(screen.width, screen.height) < 820;
 const PR_MAX = Math.min(devicePixelRatio || 1, COARSE ? 1.5 : 2), PR_MIN = COARSE ? 0.75 : 1;
 let pixelRatio = PR_MAX;
 const QS = new URLSearchParams(location.search);
+const XMAS = QS.get('xmas') !== '0';   // 크리스마스 판 (2026 겨울). ?xmas=0이면 예전 판
 const GFX = { ao: QS.has('ao') ? QS.get('ao') !== '0' : !COARSE, fps: QS.has('fps') };
 const PR_AO = Math.min(PR_MAX, 1.5);
 let renderer;
@@ -720,7 +721,7 @@ const sky = new Sky();
 let envDay = null, envNight = null;
 const nightSunPos = new THREE.Vector3(0.3, -0.08, -0.95).normalize();
 const su = sky.material.uniforms;
-su.turbidity.value = 3.2; su.rayleigh.value = 1.1; su.mieCoefficient.value = 0.004; su.mieDirectionalG.value = 0.8;
+su.turbidity.value = XMAS ? 6 : 3.2; su.rayleigh.value = XMAS ? 0.75 : 1.1; su.mieCoefficient.value = 0.004; su.mieDirectionalG.value = 0.8;
 su.sunPosition.value.copy(sunDir);
 {
   const envScene = new THREE.Scene();
@@ -730,7 +731,7 @@ su.sunPosition.value.copy(sunDir);
   envDay = pmrem.fromScene(envScene, 0, 0.1, 200).texture;
   su.sunPosition.value.copy(nightSunPos); su.rayleigh.value = 0.35; su.turbidity.value = 1.2;
   envNight = pmrem.fromScene(envScene, 0, 0.1, 200).texture;
-  su.sunPosition.value.copy(sunDir); su.rayleigh.value = 1.1; su.turbidity.value = 3.2;
+  su.sunPosition.value.copy(sunDir); su.rayleigh.value = XMAS ? 0.75 : 1.1; su.turbidity.value = XMAS ? 6 : 3.2;
   scene.environment = envDay;
   pmrem.dispose();
   sky.scale.setScalar(5000 * SCALE);
@@ -763,6 +764,9 @@ float fbm(vec2 p){ float s = 0.0, a = 0.5; for (int i = 0; i < 4; i++) { s += a 
 // earthquake waves: the vertex stage rolls the ground and sways tall things, so the whole campus moves
 const QU = { uQC: { value: new THREE.Vector2() }, uQT: { value: 0 }, uQA: { value: 0 } };
 const NIGHT = { uNight: { value: 0 } };
+const SNOWU = { uSnow: { value: XMAS ? 1 : 0 } };   // 쌓인 눈 (땅, 지붕, 나무)
+const SNOW_GLSL = `uniform float uSnow;
+vec3 snowC(vec2 p) { return vec3(0.7, 0.74, 0.8) * (0.93 + 0.07 * vnoise(p)); }`;
 const QUAKE_VS = `
 uniform vec2 uQC; uniform float uQT; uniform float uQA;
 vec3 quakeDisp(vec3 wp, float h) {
@@ -818,13 +822,13 @@ const tUni = { uTime: { value: 0 } };
 const tMat = new THREE.MeshStandardMaterial({ map: groundTex, roughness: 0.96, metalness: 0, envMapIntensity: 0.55 });
 tMat.onBeforeCompile = (sh) => {
   sh.uniforms.uTime = tUni.uTime;
-  Object.assign(sh.uniforms, QU);
+  Object.assign(sh.uniforms, QU, SNOWU);
   sh.vertexShader = sh.vertexShader
     .replace('#include <common>', '#include <common>\nvarying vec3 vWP;\nattribute float dig;\nvarying float vDig;\n' + QUAKE_VS)
     .replace('#include <project_vertex>', quakeProject('0.0'))
     .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvDig = dig;');
   sh.fragmentShader = sh.fragmentShader
-    .replace('#include <common>', '#include <common>\nvarying vec3 vWP;\nvarying float vDig;\nuniform float uTime;\n' + NOISE)
+    .replace('#include <common>', '#include <common>\nvarying vec3 vWP;\nvarying float vDig;\nuniform float uTime;\n' + NOISE + SNOW_GLSL)
     .replace('#include <map_fragment>', `#include <map_fragment>
       diffuseColor.rgb *= 0.86 + 0.28 * fbm(vWP.xz * 0.45);
       diffuseColor.rgb *= 0.92 + 0.16 * vnoise(vWP.xz * 4.0);
@@ -841,6 +845,19 @@ tMat.onBeforeCompile = (sh) => {
         diffuseColor.rgb *= mix(1.0, mix(tone * (1.0 - 0.3 * joint), 1.0, pfar), paved);
         float gn = 0.6 * vnoise(vWP.xz * 2.7) + 0.4 * vnoise(vWP.xz * 9.0);
         diffuseColor.rgb *= mix(1.0, 0.8 + 0.4 * gn, grassy);
+      }
+      if (uSnow > 0.0) {
+        // 쌓인 눈: flat ground goes white; dark asphalt stays as grey slush (ploughed), water stays open
+        vec3 c0 = diffuseColor.rgb;
+        float lum = dot(c0, vec3(0.299, 0.587, 0.114)), sat = max(c0.r, max(c0.g, c0.b)) - min(c0.r, min(c0.g, c0.b));
+        vec3 tn = normalize(cross(dFdx(vWP), dFdy(vWP)));
+        float level = smoothstep(0.6, 0.85, abs(tn.y));
+        float water = smoothstep(0.03, 0.08, c0.b - max(c0.r, c0.g * 0.85));
+        float road = (1.0 - smoothstep(0.06, 0.12, lum)) * (1.0 - smoothstep(0.04, 0.09, sat));
+        float drift = fbm(vWP.xz * 0.05);
+        float cover = clamp(0.97 - 0.82 * road - 0.9 * water + 0.3 * (drift - 0.5), 0.0, 1.0) * level * uSnow;
+        vec3 sc = snowC(vWP.xz * 1.3) * (0.9 + 0.12 * drift);
+        diffuseColor.rgb = mix(c0, sc, cover);
       }
       vec3 gGlowT = vec3(0.0);
       if (vDig > 0.25) {
@@ -1008,13 +1025,14 @@ trunkMat.onBeforeCompile = (sh) => {
 const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, TREES.length);
 const crownMat = new THREE.MeshStandardMaterial({ roughness: 0.92, envMapIntensity: 0.4 });
 crownMat.onBeforeCompile = (sh) => {
-  Object.assign(sh.uniforms, QU);
-  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vLP;\n' + QUAKE_VS).replace('#include <begin_vertex>', '#include <begin_vertex>\nvLP = position;')
+  Object.assign(sh.uniforms, QU, SNOWU);
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vLP;\nvarying vec3 vSnN;\n' + QUAKE_VS).replace('#include <begin_vertex>', '#include <begin_vertex>\nvLP = position; vSnN = objectNormal;')
     .replace('#include <project_vertex>', quakeProject('max(0.0, qwp.y - (modelMatrix * instanceMatrix[3]).y)'));
-  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vLP;\n' + NOISE)
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vLP;\nvarying vec3 vSnN;\n' + NOISE + SNOW_GLSL)
     .replace('#include <color_fragment>', `#include <color_fragment>
       float leaf = fbm(vLP.xz * 5.0 + vLP.y * 3.0);
-      diffuseColor.rgb *= (0.62 + 0.62 * leaf) * (0.62 + 0.38 * smoothstep(-0.9, 0.8, vLP.y));`);
+      diffuseColor.rgb *= (0.62 + 0.62 * leaf) * (0.62 + 0.38 * smoothstep(-0.9, 0.8, vLP.y));
+      if (uSnow > 0.0) diffuseColor.rgb = mix(diffuseColor.rgb * 0.82, vec3(0.78, 0.82, 0.88), 0.9 * uSnow * smoothstep(0.05, 0.6, normalize(vSnN).y + 0.4 * (leaf - 0.5)));`);
 };
 const crowns = new THREE.InstancedMesh(crownGeo, crownMat, TREES.length);
 crowns.castShadow = !PHONE; crowns.receiveShadow = true; trunks.castShadow = !COARSE;
@@ -1054,17 +1072,18 @@ const NODOOR = -1e5;
 const ROOF_FLAT = ['#8e8c86', '#a3a19a', '#7f7d77', '#b4b2ab', '#6b977a', '#96948d', '#8a8780', '#adaba4', '#719c80', '#9b9993'];
 const ROOF_HIP = { brick: ['#4c535c', '#8c5240'], stone: ['#5a8676', '#4c535c'], tan: ['#8c5240', '#5a8676'] };
 function patchBuilding(sh) {
-  Object.assign(sh.uniforms, this.userData.u, QU, NIGHT);
+  Object.assign(sh.uniforms, this.userData.u, QU, NIGHT, SNOWU);
   sh.vertexShader = sh.vertexShader
-    .replace('#include <common>', '#include <common>\nattribute vec2 fuv;\nattribute float fkind;\nattribute vec2 fdoor;\nvarying vec2 vFuv;\nvarying float vKind;\nvarying vec2 vDoor;\nuniform float uGround;\n' + QUAKE_VS)
+    .replace('#include <common>', '#include <common>\nattribute vec2 fuv;\nattribute float fkind;\nattribute vec2 fdoor;\nvarying vec2 vFuv;\nvarying float vKind;\nvarying vec2 vDoor;\nvarying vec3 vSnN;\nuniform float uGround;\n' + QUAKE_VS)
     .replace('#include <project_vertex>', quakeProject('max(0.0, qwp.y - uGround)'))
-    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFuv = fuv; vKind = fkind; vDoor = fdoor;');
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFuv = fuv; vKind = fkind; vDoor = fdoor; vSnN = objectNormal;');
   sh.fragmentShader = sh.fragmentShader
     .replace('#include <common>', `#include <common>
 uniform vec3 uWall; uniform vec3 uGlass; uniform vec3 uRoof; uniform vec3 uFrame;
 uniform float uBay; uniform float uFloor; uniform float uWinW; uniform float uWinH; uniform float uSill; uniform float uBrick; uniform float uSeed; uniform float uGlassRough; uniform float uTop; uniform float uLo; uniform float uNight;
-varying vec2 vFuv; varying float vKind; varying vec2 vDoor;
+varying vec2 vFuv; varying float vKind; varying vec2 vDoor; varying vec3 vSnN;
 ${NOISE}
+${SNOW_GLSL}
 float band(float x, float a, float b, float w) { return clamp(smoothstep(a - w, a + w, x) - smoothstep(b - w, b + w, x), 0.0, 1.0); }
 vec3 bumpN(vec3 p, vec3 n, vec2 dh, float fd) {
   vec3 sx = normalize(dFdx(p)), sy = normalize(dFdy(p));
@@ -1126,6 +1145,7 @@ vec3 gLitCol = vec3(1.0, 0.76, 0.42);
     vec3 nearC = mix(wall, glass, win);
     nearC = mix(nearC, uFrame, clamp(frame + bars, 0.0, 1.0));
     nearC = mix(nearC, uFrame * 1.05, ledge * 0.8);
+    nearC = mix(nearC, vec3(0.7, 0.74, 0.8), ledge * 0.9 * uSnow);
     // a soft shade under each sill and under the slab line
     float underSill = band(f.y, sill - fr.y - 0.2 / uFloor, sill - fr.y - 0.07 / uFloor, fw.y) * fx * above;
     nearC *= 1.0 - 0.22 * underSill * (1.0 - win);
@@ -1205,12 +1225,26 @@ vec3 gLitCol = vec3(1.0, 0.76, 0.42);
     col = t;
     gHgt = 0.08 * smoothstep(0.0, 0.3, fract(row)) * fade;
   }
+  if (uSnow > 0.0 && vKind < 0.5) {
+    float lip = smoothstep(uTop - 0.45 - fwy, uTop - 0.4, vFuv.y) * uSnow;
+    col = mix(col, vec3(0.7, 0.74, 0.8), lip); gGlass *= 1.0 - lip; gLit *= 1.0 - lip; gHgt *= 1.0 - lip;
+  }
   diffuseColor.rgb = col;
 }`)
     .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = bumpN(-vViewPosition, normal, vec2(dFdx(gHgt), dFdy(gHgt)) * 3.2 * (1.0 - 0.75 * gGlass), faceDirection);')
     .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, uGlassRough, gGlass);')
     .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, 0.72, gGlass);\ndiffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.35 + 0.05, gGlass);')
-    .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += uNight * gLitCol * gLit * 1.5;');
+    .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += uNight * gLitCol * gLit * 1.5;')
+    .replace('#include <lights_physical_fragment>', `
+if (uSnow > 0.0 && (vKind < 1.5 || vKind > 2.5)) {
+  // 쌓인 눈 on whatever faced up when the building stood (it stays on a chunk that tumbles); never on fresh broken faces
+  float sUp = smoothstep(0.5, 0.85, normalize(vSnN).y);
+  float sn = sUp * (0.86 + 0.14 * smoothstep(0.3, 0.6, fbm(vFuv * 0.15 + uSeed))) * uSnow;
+  diffuseColor.rgb = mix(diffuseColor.rgb, snowC(vFuv * 1.3), sn);
+  roughnessFactor = mix(roughnessFactor, 0.9, sn);
+  metalnessFactor = mix(metalnessFactor, 0.0, sn);
+}
+#include <lights_physical_fragment>`);
 }
 function hashStr(s) { let h = 2166136261; for (const ch of s) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
 // the building's name and OSM kind pick a facade first; the rest stay a stable random mix
@@ -1869,7 +1903,7 @@ function fireball(pt) {
   ring.rotation.x = -Math.PI / 2; ring.position.set(pt.x, groundY(pt.x, pt.z) + 0.6, pt.z);
   scene.add(ring);
   fx.push({ obj: ring, t: 0, life: 0.7, grow: 42, kind: 'ring' });
-  flashLight.position.copy(pt).add(_v.set(0, 4, 0));
+  flashLight.color.set(0xffa860); flashLight.position.copy(pt).add(_v.set(0, 4, 0));
   fx.push({ obj: flashLight, t: 0, life: 0.45, kind: 'flash' });
   for (let i = 0; i < 70; i++) {
     const s = rand(0.18, 0.32);
@@ -2122,6 +2156,657 @@ function addShake(amount, at) {
 }
 const wobble = (x) => Math.sin(x) * 0.5 + Math.sin(x * 2.31 + 1.7) * 0.3 + Math.sin(x * 4.73 + 0.3) * 0.2;
 
+// ============ 크리스마스 판 (XMAS): 눈 내림과 쌓인 눈, 눈덩이·트리 장식(폭탄), 캔디케인(배트), 루돌프 러쉬(레이저), 트리 투창(빼빼로)
+// 부수는 힘과 점수는 원래 무기와 같고 모양·효과·소리만 바뀐다. 주소에 ?xmas=0을 붙이면 예전 판
+const _pdown = new THREE.Vector3(0, -1, 0), _xv = new THREE.Vector3(), _xa = new THREE.Vector3();
+const angDiff = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+// snow chunks that arc and fall (normal blending, so they read white by day and by night)
+const SNOWBITS = XMAS ? makeSystem(PHONE ? 1000 : 1800, 1.15, THREE.NormalBlending) : null;
+if (SNOWBITS) { SNOWBITS.drag = 0.7; SNOWBITS.grav = 15; }
+const snowBit = (x, y, z, vx, vy, vz, life, r = 0.95, g = 0.97, b = 1, a = 1) => emit(SNOWBITS, x, y, z, vx, vy, vz, life, r, g, b, a);
+
+// ---- 눈 내림: three boxes of flakes that wrap around the camera (60 m, 300 m, 1.5 km), each scaled to its box,
+// so the snow looks the same close up and from high above. Drawn at 30 fps when nothing else moves
+const snowFall = (() => {
+  if (!XMAS) return null;
+  const N = PHONE ? 2600 : COARSE ? 3600 : 6000;
+  const geo = new THREE.BufferGeometry(), seed = new Float32Array(N * 4), R = mulberry(1225);
+  for (let i = 0; i < N * 4; i++) seed[i] = R();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3));
+  geo.setAttribute('seed', new THREE.BufferAttribute(seed, 4));
+  const U = { uT: { value: 0 }, uCam: { value: new THREE.Vector3() }, uPx: { value: 600 }, uCol: { value: new THREE.Color(2.3, 2.35, 2.45) }, uOp: { value: 0.85 }, uFog: { value: new THREE.Vector2(400, 1600) } };
+  const vs = `attribute vec4 seed;
+uniform float uT, uBox, uPx; uniform vec3 uCam; uniform vec2 uFog;
+varying float vA;
+void main() {
+  float sp = 0.7 + 0.6 * seed.w, fall = uBox / 46.0;
+  vec3 p = seed.xyz * uBox;
+  p.y -= uT * fall * sp;
+  p.x += uT * fall * 0.22 + sin(uT * (0.5 + 0.7 * seed.w) + seed.x * 30.0) * uBox * 0.012;
+  p.z += uT * fall * 0.08 + cos(uT * (0.4 + 0.6 * seed.w) + seed.z * 30.0) * uBox * 0.012;
+  vec3 rel = mod(p - uCam + 0.5 * uBox, uBox) - 0.5 * uBox;
+  vec4 mv = viewMatrix * vec4(uCam + rel, 1.0);
+  gl_Position = projectionMatrix * mv;
+  float d = max(-mv.z, 0.01);
+  gl_PointSize = min(28.0, 0.0017 * uBox * (0.6 + 0.8 * seed.w) * uPx / d);
+  vec3 q = abs(rel) / (0.5 * uBox);
+  vA = (1.0 - smoothstep(0.7, 1.0, max(q.x, max(q.y, q.z)))) * smoothstep(0.025 * uBox, 0.07 * uBox, d) * (1.0 - smoothstep(uFog.x, uFog.y, d));
+  if (mv.z > 0.0) vA = 0.0;
+}`;
+  const fs = `uniform vec3 uCol; uniform float uOp; varying float vA;
+void main() {
+  float a = smoothstep(0.5, 0.12, length(gl_PointCoord - 0.5)) * vA * uOp;
+  if (a < 0.004) discard;
+  gl_FragColor = vec4(uCol, a);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}`;
+  const layers = [60, 300, 1500].map((box) => {
+    const mat = new THREE.ShaderMaterial({ uniforms: { ...U, uBox: { value: box } }, vertexShader: vs, fragmentShader: fs, transparent: true, depthWrite: false });
+    const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; pts.renderOrder = 8; scene.add(pts);
+    return pts;
+  });
+  let on = true;
+  try { on = localStorage.getItem('smash-snow') !== '0'; } catch (e) { /* storage blocked */ }
+  const S = {
+    get on() { return on; },
+    set(v) { on = v; for (const p of layers) p.visible = v; },
+    night(n) { U.uCol.value.setRGB(n ? 0.85 : 2.3, n ? 0.9 : 2.35, n ? 1.1 : 2.45); U.uOp.value = n ? 0.8 : 0.85; },
+    update(dt) {
+      if (!on) return;
+      U.uT.value = (U.uT.value + dt) % 9200;
+      U.uCam.value.copy(camera.position);
+      U.uPx.value = renderer.domElement.height / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
+      U.uFog.value.set(scene.fog.near * 0.45, scene.fog.far * 0.5);
+    },
+  };
+  S.set(on);
+  return S;
+})();
+
+// ---- 눈덩이 & 트리 장식 (폭탄 자리): half the throws are a packed snowball, half a glass Christmas bauble
+const ORN = [0xc8102e, 0xd9a21b, 0x1d4fa3, 0x1f7a3d, 0xcfd5db, 0x8a1c7c];
+let snowballG = null;
+const snowMat = new THREE.MeshStandardMaterial({ color: 0xf1f4f9, roughness: 0.92 });
+const ornMats = {}, ornGold = new THREE.MeshStandardMaterial({ color: 0xd8b04a, roughness: 0.3, metalness: 0.9 });
+function snowballGeo() {
+  if (!snowballG) {
+    snowballG = mergeVertices(new THREE.IcosahedronGeometry(1.9, 3).deleteAttribute('normal').deleteAttribute('uv'));
+    const p = snowballG.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+      const n = 1 + 0.06 * Math.sin(5.1 * x + 1.3) * Math.sin(4.7 * y + 0.2) * Math.sin(5.3 * z + 2.1) + 0.03 * Math.sin(13 * x + 7 * z);
+      p.setXYZ(i, x * n, y * n, z * n);
+    }
+    snowballG.computeVertexNormals();
+  }
+  return snowballG;
+}
+function makeXmasBomb() {
+  if (Math.random() < 0.5) {
+    const m = new THREE.Mesh(snowballGeo(), snowMat); m.castShadow = true;
+    return { m, kind: { k: 'snow', col: new THREE.Color(1, 1, 1) } };
+  }
+  const c = ORN[Math.floor(Math.random() * ORN.length)];
+  const mat = ornMats[c] || (ornMats[c] = new THREE.MeshStandardMaterial({ color: c, roughness: 0.14, metalness: 0.55, envMapIntensity: 1.5 }));
+  const g = new THREE.Group();
+  const add = (geo, mt, y = 0) => { const m = new THREE.Mesh(geo, mt); m.position.y = y; m.castShadow = true; g.add(m); return m; };
+  add(new THREE.SphereGeometry(1.6, 28, 18), mat);
+  if (Math.random() < 0.6) add(new THREE.TorusGeometry(1.6, 0.11, 8, 40), ornGold).rotation.x = Math.PI / 2;
+  add(new THREE.CylinderGeometry(0.42, 0.48, 0.5, 14), ornGold, 1.72);
+  add(new THREE.TorusGeometry(0.26, 0.07, 6, 16), ornGold, 2.18);
+  return { m: g, kind: { k: 'orn', col: new THREE.Color(c) } };
+}
+function xmasTrail(bo) {
+  const p = bo.m.position;
+  if (bo.kind.k === 'snow') { if (Math.random() < 0.7) snowBit(p.x, p.y, p.z, rand(-2, 2), rand(-1, 2), rand(-2, 2), rand(0.3, 0.6), 0.95, 0.97, 1, 0.9); }
+  else if (Math.random() < 0.8) { const c = bo.kind.col; emit(sparks, p.x, p.y + 0.5, p.z, rand(-3, 3), rand(0, 4), rand(-3, 3), rand(0.2, 0.45), c.r + 0.4, c.g + 0.4, c.b + 0.4, 1); }
+}
+// the blast: a cloud of powder snow, or a coloured flash and a burst of glass and glitter
+function xmasBurst(pt, kind, k = 1) {
+  const snow = kind.k === 'snow', c = kind.col;
+  for (let i = 0; i < 8; i++) {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial(snow
+      ? { map: SOFT, color: new THREE.Color(1.5, 1.55, 1.65), transparent: true, opacity: 0.9, depthWrite: false }
+      : { map: FIRE, color: c.clone().multiplyScalar(2.2).addScalar(0.4), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    sp.position.copy(pt).add(_v.set(rand(-3, 3), rand(0, 4), rand(-3, 3)).multiplyScalar(k));
+    sp.scale.setScalar(2); scene.add(sp);
+    fx.push({ obj: sp, t: 0, life: rand(0.6, 1.1) * (snow ? 1.3 : 0.8), grow: rand(16, 26) * k, kind: 'fire' });
+  }
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.85, 1, 64), new THREE.MeshBasicMaterial({ color: snow ? 0xf4f8ff : c, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide }));
+  ring.rotation.x = -Math.PI / 2; ring.position.set(pt.x, groundY(pt.x, pt.z) + 0.6, pt.z); scene.add(ring);
+  fx.push({ obj: ring, t: 0, life: 0.7, grow: 42 * k, kind: 'ring' });
+  flashLight.color.copy(snow ? new THREE.Color(0xdfe9ff) : c); flashLight.position.copy(pt).add(_v.set(0, 4, 0));
+  fx.push({ obj: flashLight, t: 0, life: 0.45, kind: 'flash', peak: snow ? 700 : 2200 });
+  const nb = Math.round((PHONE ? 150 : 240) * k);
+  for (let i = 0; i < nb; i++) {
+    if (snow || i % 2) snowBit(pt.x + rand(-2, 2), pt.y + rand(0, 2), pt.z + rand(-2, 2), rand(-28, 28) * k, rand(6, 34) * k, rand(-28, 28) * k, rand(1.2, 2.6), snow ? 0.95 : c.r * 0.8 + 0.15, snow ? 0.97 : c.g * 0.8 + 0.15, snow ? 1 : c.b * 0.8 + 0.15, 1);
+    else emit(sparks, pt.x, pt.y + 1, pt.z, rand(-40, 40) * k, rand(5, 45) * k, rand(-40, 40) * k, rand(0.5, 1.3), c.r + 0.5, c.g + 0.5, c.b + 0.5, 1);
+  }
+  if (!snow) for (let i = 0; i < 70; i++) emit(sparks, pt.x, pt.y + 1, pt.z, rand(-30, 30), rand(5, 40), rand(-30, 30), rand(0.6, 1.4), 1, 0.85, 0.45, 1);
+  for (let i = 0; i < 60 * k; i++) {
+    const s = snow ? rand(0.82, 0.92) : rand(0.6, 0.75);
+    emit(smoke, pt.x + rand(-5, 5) * k, pt.y + rand(0, 6) * k, pt.z + rand(-5, 5) * k, rand(-9, 9), rand(2, 12), rand(-9, 9), rand(2.5, 5), s, s * 1.01, s * 1.04, rand(0.4, 0.6));
+  }
+  puff(pt, Math.round(100 * k), 7 * k, 10);
+}
+
+// ---- 캔디케인 (배트 자리): a red-and-white striped sugar cane, held by the straight end, the crook at the far end
+let caneParts = null;
+function makeCane() {
+  if (!caneParts) {
+    const cv = document.createElement('canvas'); cv.width = cv.height = 128;
+    const g = cv.getContext('2d');
+    g.fillStyle = '#f6f1ea'; g.fillRect(0, 0, 128, 128);
+    g.fillStyle = '#c9142b';
+    for (const [o, w] of [[0, 40], [70, 12]]) for (let k = -1; k <= 1; k++) {   // stripes along u + v = const: a helix once wrapped round the tube
+      const x0 = o + 128 * k; g.beginPath(); g.moveTo(x0, 0); g.lineTo(x0 + w, 0); g.lineTo(x0 + w + 128, 128); g.lineTo(x0 + 128, 128); g.closePath(); g.fill();
+    }
+    const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(7, 1);
+    tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    const S = 4.3, r = 0.6, E = 0.35;
+    class Cane extends THREE.Curve {
+      getPoint(t, out = new THREE.Vector3()) {
+        const L = S + Math.PI * r + E, s = t * L;
+        if (s <= S) return out.set(0, s, 0);
+        if (s <= S + Math.PI * r) { const a = (s - S) / r; return out.set(-r + r * Math.cos(a), S + r * Math.sin(a), 0); }
+        return out.set(-2 * r, S - (s - S - Math.PI * r), 0);
+      }
+    }
+    const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.26, metalness: 0, envMapIntensity: 1.2 });
+    const cap = new THREE.SphereGeometry(0.3, 14, 10);
+    caneParts = { tube: new THREE.TubeGeometry(new Cane(), 90, 0.3, 16, false), cap, mat, end: new THREE.Vector3(-2 * r, S - E, 0) };
+  }
+  const inner = new THREE.Group();
+  const add = (geo, y = 0, x = 0) => { const m = new THREE.Mesh(geo, caneParts.mat); m.position.set(x, y, 0); m.castShadow = true; inner.add(m); };
+  add(caneParts.tube); add(caneParts.cap); add(caneParts.cap, caneParts.end.y, caneParts.end.x);
+  inner.rotation.z = -Math.PI / 2;               // handle at the pivot, the shaft along +x, the crook curling up
+  const pitch = new THREE.Group(); pitch.add(inner);
+  const yaw = new THREE.Group(); yaw.add(pitch);
+  yaw.userData.pitch = pitch;
+  return yaw;
+}
+function candyBits(pt) {
+  for (let i = 0; i < 26; i++) { const red = i % 2; snowBit(pt.x, pt.y, pt.z, rand(-14, 14), rand(4, 16), rand(-14, 14), rand(0.8, 1.6), red ? 0.8 : 0.97, red ? 0.08 : 0.95, red ? 0.14 : 0.92, 1); }
+}
+
+// ---- 루돌프 러쉬 (레이저 자리): drag a path and a giant red-nosed reindeer flies down, charges along it and takes off again
+const DEER_S = 12, RUSH_IN = 0.9;
+const deerPool = [];
+let deerM = null;
+function buildDeer() {
+  if (!deerM) {
+    const S = (c, r = 0.88) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
+    deerM = { fur: new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.88 }), mid: S(0x6e4528), leg: S(0x5a3a22), cream: S(0xe6dac4, 0.95),
+      hoof: S(0x231b16, 0.6), antler: S(0xcdb38b, 0.8), eye: new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 0.12, metalness: 0.3 }),
+      nose: new THREE.MeshStandardMaterial({ color: 0xff2a2a, emissive: 0xff1010, emissiveIntensity: 2.6, roughness: 0.3 }),
+      red: S(0xb3141f, 0.6), gold: new THREE.MeshStandardMaterial({ color: 0xe2b13c, roughness: 0.28, metalness: 0.9 }) };
+  }
+  const M = deerM, root = new THREE.Group(), body = new THREE.Group();
+  root.rotation.order = 'YXZ';
+  body.position.y = 1.18; root.add(body);
+  const add = (par, geo, mat, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; par.add(m); return m; };
+  const ell = (rx, ry, rz, seg = 18) => new THREE.SphereGeometry(1, seg, Math.max(8, Math.round(seg * 0.65))).scale(rx, ry, rz);
+  // torso: a dark back fading to a pale belly
+  const torso = ell(0.4, 0.44, 0.86, 28), tp = torso.attributes.position, tc = new Float32Array(tp.count * 3);
+  const cB = new THREE.Color(0x4a2e1a), cM = new THREE.Color(0x7a4e2d), cL = new THREE.Color(0xd6c3a0), cc = new THREE.Color();
+  for (let i = 0; i < tp.count; i++) {
+    const y = tp.getY(i);
+    if (y > 0.12) cc.copy(cM).lerp(cB, Math.min(1, (y - 0.12) / 0.25)); else cc.copy(cM).lerp(cL, THREE.MathUtils.smoothstep(-y, 0.05, 0.3));
+    tc.set([cc.r, cc.g, cc.b], 3 * i);
+  }
+  torso.setAttribute('color', new THREE.BufferAttribute(tc, 3));
+  add(body, torso, M.fur);
+  add(body, ell(0.31, 0.36, 0.3), M.cream, 0, -0.03, 0.6);            // pale chest mane
+  add(body, ell(0.11, 0.12, 0.08, 10), M.cream, 0, 0.2, -0.86);       // tail
+  const neck = new THREE.Group(); neck.position.set(0, 0.16, 0.56); body.add(neck);
+  const nd = new THREE.Vector3(0, 0.62, 0.34), ndn = nd.clone().normalize(), nl = nd.length();
+  add(neck, new THREE.CylinderGeometry(0.15, 0.22, nl, 12).translate(0, nl / 2, 0), M.mid).quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), ndn);
+  const collar = add(neck, new THREE.TorusGeometry(0.205, 0.04, 8, 26), M.red, 0, ndn.y * 0.18, ndn.z * 0.18);
+  collar.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), ndn);
+  add(neck, new THREE.SphereGeometry(0.075, 12, 10), M.gold, 0, 0.0, 0.29);   // the bell
+  const head = new THREE.Group(); head.position.copy(nd); neck.add(head);
+  add(head, ell(0.165, 0.165, 0.27, 16), M.mid, 0, 0.02, 0.1).rotation.x = 0.3;
+  add(head, ell(0.115, 0.1, 0.17, 14), M.mid, 0, -0.06, 0.33).rotation.x = 0.2;
+  const nose = add(head, new THREE.SphereGeometry(0.09, 14, 10), M.nose, 0, -0.06, 0.5);
+  for (const s of [-1, 1]) {
+    add(head, new THREE.SphereGeometry(0.032, 8, 6), M.eye, s * 0.11, 0.07, 0.21);
+    add(head, ell(0.045, 0.12, 0.028, 8), M.mid, s * 0.15, 0.12, 0.0).rotation.set(0.3, 0, -s * 1.0);
+    const P = (x, y, z) => new THREE.Vector3(s * x, y, z);
+    const beam = new THREE.CatmullRomCurve3([P(0.06, 0.12, -0.02), P(0.14, 0.36, -0.08), P(0.3, 0.62, -0.16), P(0.4, 0.88, -0.06), P(0.37, 1.06, 0.1)]);
+    add(head, new THREE.TubeGeometry(beam, 20, 0.034, 6), M.antler);
+    for (const [u, dx, dy, dz] of [[0.2, -0.03, 0.08, 0.22], [0.48, 0.05, 0.2, 0.16], [0.7, -0.07, 0.2, 0.13], [0.86, 0.11, 0.13, 0.08]]) {
+      const a = beam.getPoint(u), b = a.clone().add(P(dx, dy, dz)), m = a.clone().lerp(b, 0.5).add(new THREE.Vector3(0, 0.03, 0.02));
+      add(head, new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(a, m, b), 6, 0.024, 5), M.antler);
+    }
+  }
+  const legs = [];
+  for (const [x, z, front, ph] of [[-0.2, 0.52, true, 0.42], [0.2, 0.52, true, 0.52], [-0.22, -0.56, false, 0], [0.22, -0.56, false, 0.1]]) {
+    const hip = new THREE.Group(); hip.position.set(x, -0.08, z); body.add(hip);
+    add(hip, new THREE.CylinderGeometry(front ? 0.1 : 0.13, 0.065, 0.52, 10).translate(0, -0.26, 0), M.mid);
+    const knee = new THREE.Group(); knee.position.y = -0.5; hip.add(knee);
+    add(knee, new THREE.CylinderGeometry(0.055, 0.045, 0.5, 8).translate(0, -0.25, 0), M.leg);
+    add(knee, new THREE.CylinderGeometry(0.06, 0.075, 0.1, 10), M.hoof, 0, -0.53, 0.01);
+    legs.push({ hip, knee, front, ph });
+  }
+  return { root, body, neck, nose, legs };
+}
+const takeDeer = () => { let d = deerPool.find((x) => !x.root.parent); if (!d) { d = buildDeer(); deerPool.push(d); } d.root.scale.setScalar(DEER_S); d.root.rotation.set(0, 0, 0); return d; };
+function deerPose(D, mode, ph, t = 0) {
+  const a0 = ph * Math.PI * 2;
+  if (mode === 'run') {
+    for (const L of D.legs) {
+      const a = a0 + L.ph * Math.PI * 2;
+      L.hip.rotation.x = (L.front ? 0.72 : 0.62) * Math.sin(a);
+      L.knee.rotation.x = L.front ? 1.1 * Math.max(0, Math.sin(a + 1.3)) : -0.9 * Math.max(0, Math.sin(a - 0.9));
+    }
+    D.body.position.y = 1.18 + 0.08 * Math.abs(Math.sin(a0));
+    D.body.rotation.x = 0.08 * Math.sin(a0 + 0.9);
+    D.neck.rotation.x = -0.12 * Math.sin(a0 + 0.9);
+  } else if (mode === 'fly') {
+    for (const L of D.legs) {
+      L.hip.rotation.x = (L.front ? -1.05 : 0.95) + 0.12 * Math.sin(a0 + L.ph * 6);
+      L.knee.rotation.x = L.front ? 1.65 : -0.35;
+    }
+    D.body.position.y = 1.18; D.body.rotation.x = 0.05 * Math.sin(a0); D.neck.rotation.x = 0.1;
+  } else {   // 'rear': rears up on the hind legs, then slams down
+    const up = Math.sin(Math.PI * Math.min(1, t * 1.25));
+    D.body.rotation.x = -0.75 * up; D.body.position.y = 1.18 + 0.5 * up; D.neck.rotation.x = 0.3 * up;
+    for (const L of D.legs) { L.hip.rotation.x = L.front ? -0.9 * up : 0.25 * up; L.knee.rotation.x = L.front ? 1.4 * up : -0.3 * up; }
+  }
+}
+function deerGlow(D, k) {
+  D.nose.getWorldPosition(_xv);
+  laserLight.color.set(0xff2a2a); laserLight.position.copy(_xv); laserLight.intensity = (night ? 1600 : 45) * k;
+}
+function makeFurrow(path) {
+  const m = makeMolten(path);
+  m.material.dispose();
+  m.material = new THREE.MeshStandardMaterial({ color: 0x8e8881, roughness: 1, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 });
+  const nrm = new Float32Array(m.geometry.attributes.position.count * 3);
+  for (let i = 1; i < nrm.length; i += 3) nrm[i] = 1;
+  m.geometry.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  m.receiveShadow = true;
+  return m;
+}
+function fireRush(pts) {
+  pushHistory();
+  const path = [pts[0].clone()];
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i], n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 1.5));
+    for (let k = 1; k <= n; k++) path.push(a.clone().lerp(b, k / n));
+  }
+  const len = (path.length - 1) * 1.5, n = path.length;
+  const dur = Math.min(2.4 + Math.max(0, len - 520) / 800, Math.max(0.8, len / 120));
+  let fx0, fz0;
+  if (n > 3) { const b = path[Math.min(n - 1, 8)]; fx0 = b.x - path[0].x; fz0 = b.z - path[0].z; }
+  else { camera.getWorldDirection(_xv); fx0 = _xv.x; fz0 = _xv.z; }
+  const D = takeDeer(), yaw = Math.atan2(fx0, fz0);
+  D.root.position.copy(path[0]); D.root.rotation.set(0, yaw, 0); scene.add(D.root);
+  laserBeam = { rush: true, deer: D, path, phase: 'charge', ct: 0, t: 0, dur, idx: 0, mesh: D.root, flare: new THREE.Object3D(), molten: makeFurrow(path),
+    touched: new Set(), digs: [], lastFlush: 0, moltenY: 0, nextBurst: 0, nextBell: 0, yaw, ph: 0, kerf: 4.6, side: 11, speed: len / dur,
+    act: { tool: 'laser', pt: path[Math.floor(n / 2)].clone(), vol: 0, splits: 0, air: 0, dug: 0, layer: -1, center: false,
+      pre: [n > 3 ? '루돌프 러쉬!' : '루돌프 박치기!'], bonus: n > 3 ? 400 + len * 4 : 200 } };
+  scene.add(laserBeam.molten);
+  showLaserPath(path);
+  SFX.jingle(16, 0.9, 0.09); SFX.swoop(0.9, false);
+}
+function updateRush(dt) {
+  const L = laserBeam, D = L.deer, n = L.path.length;
+  if (L.phase === 'charge') {
+    // flies in from behind and above the start of the path and lands on it
+    L.ct += dt;
+    const k = Math.min(1, L.ct / RUSH_IN), e = 1 - (1 - k) * (1 - k);
+    const p0 = L.path[0], gy = groundY(p0.x, p0.z), sx = Math.sin(L.yaw), sz = Math.cos(L.yaw), back = 150 * (1 - e);
+    D.root.position.set(p0.x - sx * back, gy + 100 * (1 - k) * (1 - k), p0.z - sz * back);
+    D.root.rotation.set(0.32 * (1 - k), L.yaw, 0);
+    L.ph += dt * 2.2; deerPose(D, k < 0.85 ? 'fly' : 'run', L.ph);
+    deerGlow(D, 0.5 + 0.5 * k);
+    laserLine.material.opacity = 0.45 + 0.55 * Math.abs(Math.sin(L.ct * 9));
+    for (let i = 0; i < 3; i++) emit(sparks, D.root.position.x + rand(-6, 6), D.root.position.y + rand(4, 16), D.root.position.z + rand(-6, 6), rand(-2, 2), rand(-2, 2), rand(-2, 2), rand(0.4, 0.9), 1, 0.82, 0.42, 1);
+    if (k >= 1) {
+      L.phase = 'fire'; laserLine.visible = false; laserLine.material.opacity = 0.95;
+      for (let i = 0; i < 90; i++) snowBit(p0.x + rand(-8, 8), gy + rand(0, 2), p0.z + rand(-8, 8), rand(-20, 20), rand(4, 20), rand(-20, 20), rand(0.8, 1.8));
+      puff(new THREE.Vector3(p0.x, gy + 2, p0.z), 40, 8, 6);
+      addShake(0.6, p0); SFX.thump(); SFX.rush(L.dur, L.speed, n > 3);
+    }
+    return;
+  }
+  L.t += dt;
+  const k = Math.min(1, L.t / L.dur), f = k * (n - 1);
+  const upto = Math.min(n - 1, Math.floor(f + 8));   // the cut runs a little ahead of the body: buildings go where the head hits
+  const prev = curAct; curAct = L.act;
+  const now = new Set();
+  while (L.idx <= upto) {
+    const a = L.path[Math.max(0, L.idx - 1)], b = L.path[Math.min(n - 1, L.idx + 1)];
+    let tx = b.x - a.x, tz = b.z - a.z; const tl = Math.hypot(tx, tz) || 1;
+    laserCut(L.path[L.idx], L, now, -tz / tl, tx / tl);
+    L.idx++;
+  }
+  for (const b of now) rebuildStatic(b);
+  if (L.trees) { placeTrees(); L.trees = false; }
+  if (L.t - L.lastFlush > 0.25 || L.idx >= n) {
+    L.lastFlush = L.t;
+    for (const q of L.digs) digAt(q.x, q.z, 4.6, 1.4, true);
+    L.digs = []; flushDig();
+    const pos = L.molten.geometry.attributes.position;
+    for (let i = L.moltenY; i < L.idx; i++) { const q = L.path[i], y = groundY(q.x, q.z) + 0.35; pos.setY(2 * i, y); pos.setY(2 * i + 1, y); }
+    L.moltenY = L.idx; pos.needsUpdate = true;
+  }
+  L.molten.geometry.setDrawRange(0, Math.max(0, Math.min(L.idx, Math.ceil(f) + 1) - 1) * 6);
+  curAct = prev;
+  // the body follows the path, turning smoothly
+  const i0 = Math.min(n - 1, Math.floor(f)), i1 = Math.min(n - 1, i0 + 1);
+  const q = _xa.copy(L.path[i0]).lerp(L.path[i1], f - i0), gy = groundY(q.x, q.z);
+  const a = L.path[Math.max(0, i0 - 5)], b = L.path[Math.min(n - 1, i0 + 6)];
+  if ((b.x - a.x) ** 2 + (b.z - a.z) ** 2 > 1) L.yaw += angDiff(Math.atan2(b.x - a.x, b.z - a.z), L.yaw) * (1 - Math.exp(-dt * 12));
+  D.root.position.set(q.x, gy, q.z); D.root.rotation.set(0, L.yaw, 0);
+  if (n > 3) { L.ph += dt * Math.min(4.2, Math.max(1.8, L.speed / 50)); deerPose(D, 'run', L.ph); } else deerPose(D, 'rear', 0, k);
+  deerGlow(D, 0.85 + 0.15 * Math.sin(L.t * 30));
+  const sx = Math.sin(L.yaw), sz = Math.cos(L.yaw);
+  // snow kicked up behind the hooves, gold sparkles off the antlers
+  for (let i = 0; i < (PHONE ? 4 : 7); i++) snowBit(q.x - sx * rand(4, 10) + rand(-4, 4), gy + rand(0.3, 2), q.z - sz * rand(4, 10) + rand(-4, 4), -sx * rand(4, 14) + rand(-6, 6), rand(4, 14), -sz * rand(4, 14) + rand(-6, 6), rand(0.6, 1.3));
+  for (let i = 0; i < 3; i++) emit(sparks, q.x + rand(-5, 5), gy + rand(22, 36), q.z + rand(-5, 5), -sx * rand(5, 15), rand(-2, 4), -sz * rand(5, 15), rand(0.4, 0.9), 1, 0.84, 0.45, 1);
+  emit(smoke, q.x - sx * 8 + rand(-4, 4), gy + 3, q.z - sz * 8 + rand(-4, 4), rand(-2, 2), rand(3, 7), rand(-2, 2), rand(1.5, 3), 0.84, 0.86, 0.9, 0.4);
+  if (L.t >= L.nextBurst) { L.nextBurst = L.t + 0.13; rushBurst(q.x + sx * 12 + rand(-2, 2), gy, q.z + sz * 12 + rand(-2, 2)); }
+  trauma = Math.max(trauma, 0.38);
+  if (k >= 1 && L.idx >= n) finishRush();
+}
+function rushBurst(x, gy, z) {
+  for (let i = 0; i < (PHONE ? 16 : 26); i++) snowBit(x + rand(-4, 4), gy + rand(0.5, 4), z + rand(-4, 4), rand(-18, 18), rand(6, 26), rand(-18, 18), rand(0.8, 1.8));
+  puff(new THREE.Vector3(x, gy + 3, z), 16, 3, 8);
+  for (let i = 0; i < 4; i++) emit(smoke, x + rand(-3, 3), gy + rand(1, 5), z + rand(-3, 3), rand(-2, 2), rand(4, 9), rand(-2, 2), rand(2, 3.5), 0.82, 0.84, 0.88, 0.5);
+}
+function finishRush() {
+  const L = laserBeam; laserBeam = null; laserLine.material.color.set(0xff2a55);
+  const prev = curAct; curAct = L.act;
+  for (const b of L.touched) { support(b); wakeNear(b.x0, b.x1, b.z0, b.z1); rebuildStatic(b); }
+  if (L.path.length > 1) {
+    const mark = { pts: L.path.map((q) => [q.x, q.z]), w: 10, color: 'rgba(96,88,80,.5)' };
+    scorches.push(mark); drawScorch(mark);
+  }
+  fx.push({ obj: L.molten, t: 0, life: 3, kind: 'furrow', update(e, t) { e.obj.material.opacity = 0.85 * (1 - t); } });
+  const end = L.path[L.path.length - 1], gy = groundY(end.x, end.z);
+  xmasBurst(new THREE.Vector3(end.x, gy + 3, end.z), { k: 'snow', col: new THREE.Color(1, 1, 1) }, 0.8);
+  SFX.xmasPop('snow', camera.position.distanceTo(end)); addShake(0.6, end);
+  rushTakeoff(L);
+  capPieces();
+  endAct();
+  curAct = prev;
+}
+function rushTakeoff(L) {
+  // up and away into the sky, trailing stars
+  const D = L.deer, p = D.root.position.clone(), yaw = L.yaw, sx = Math.sin(yaw), sz = Math.cos(yaw);
+  SFX.jingle(18, 1.3, 0.08); SFX.swoop(1.2, true);
+  fx.push({ obj: D.root, t: 0, life: 2, kind: 'deerfly', update(e, t) {
+    const s = e.t, f = 60 * s + 30 * s * s;
+    D.root.position.set(p.x + sx * f, p.y + 22 * s + 46 * s * s, p.z + sz * f);
+    D.root.rotation.set(-0.5 * Math.min(1, s * 2), yaw, 0);
+    deerPose(D, 'fly', s * 2.4);
+    D.root.scale.setScalar(DEER_S * (t < 0.65 ? 1 : 1 - 0.92 * (t - 0.65) / 0.35));
+    deerGlow(D, t > 0.96 ? 0 : 1 - t * 0.6);
+    for (let i = 0; i < 4; i++) emit(sparks, D.root.position.x + rand(-5, 5) * (1 - t), D.root.position.y + rand(4, 14) * (1 - t), D.root.position.z + rand(-5, 5) * (1 - t), rand(-2, 2), rand(-4, 0), rand(-2, 2), rand(0.5, 1.1), 1, rand(0.75, 0.95), rand(0.35, 0.8), 1);
+  } });
+}
+
+// ---- 트리 투창 (빼빼로 자리): a Christmas tree thrown trunk first; it sticks in walls, and stands up straight where it lands in the ground
+const TREE_KINDS = [
+  { k: 'classic', n: '클래식', coat: 0x1f4a2b, orn: [0xc8102e, 0xd9a21b], bulb: [[3, 2.2, 1]], snow: 0.35 },
+  { k: 'silver', n: '실버', coat: 0x1d4530, orn: [0xd2d8de, 0x2a5fb8], bulb: [[2.4, 2.7, 3.2]], snow: 0.5 },
+  { k: 'candy', n: '알록달록', coat: 0x22542f, orn: [0xd0142c, 0xf2eee6, 0x2e8b4a, 0xd9a21b], bulb: [[3.2, 0.6, 0.6], [0.6, 2.8, 0.8], [0.8, 1.2, 3.2], [3.2, 2.4, 0.6]], snow: 0.25 },
+  { k: 'snowy', n: '눈 트리', coat: 0x26503a, orn: [0xd9a21b, 0xb3141f], bulb: [[3.2, 2.6, 1.5]], snow: 0.85 },
+];
+const TREE_T = [[-6.5, 9.6, 6.4], [-11.6, 9, 5.3], [-16.8, 8.4, 4.2], [-21.8, 7.8, 3.15], [-26.6, 7.6, 2.1]];   // tiers: base (z), height, radius
+const treeR = (z) => { let r = 0; for (const [zb, h, rr] of TREE_T) if (z <= zb && z >= zb - h) r = Math.max(r, rr * (1 - (zb - z) / h)); return r; };
+const treeGeo = {};
+let treeMat = null;
+function treeParts(f) {
+  if (treeGeo[f.k]) return treeGeo[f.k];
+  let seed = 7 + f.k.length * 131 + f.coat % 997;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const toZ = (g) => g.rotateX(-Math.PI / 2);   // +y (up the tree) becomes −z: the trunk end is the tip at the origin
+  const trunk = toZ(new THREE.CylinderGeometry(0.85, 0.5, 9, 10, 1)).translate(0, 0, -4.5);
+  const green = new THREE.Color(f.coat), white = new THREE.Color(0xeef2f6), c = new THREE.Color();
+  const tiers = TREE_T.map(([zb, h, r], ti) => {
+    const g = new THREE.ConeGeometry(r, h, 28, 4, false).translate(0, h / 2, 0);
+    const p = g.attributes.position, nr = g.attributes.normal, col = new Float32Array(p.count * 3);
+    for (let i = 0; i < p.count; i++) {
+      let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+      const under = nr.getY(i) < -0.9, rr = Math.hypot(x, z), th = Math.atan2(z, x), edge = rr / r;
+      const sc = 1 + 0.1 * Math.sin(th * 9 + ti * 1.7) * edge;   // scalloped branch tips that droop at the rim
+      x *= sc; z *= sc; y -= 0.9 * edge * edge * (0.6 + 0.4 * Math.sin(th * 9 + ti * 1.7 + 1.3));
+      p.setXYZ(i, x, y, z);
+      c.copy(green).multiplyScalar((under ? 0.45 : 0.72 + 0.5 * rnd()) * (0.75 + 0.35 * y / h));
+      const sn = under ? 0 : f.snow * THREE.MathUtils.smoothstep(edge, 0.3, 0.95) * (0.55 + 0.45 * Math.sin(th * 5 + y * 1.7 + ti));
+      if (sn > 0.28) c.lerp(white, Math.min(1, (sn - 0.28) * 4));
+      col.set([c.r, c.g, c.b], 3 * i);
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    g.computeVertexNormals();
+    return toZ(g).translate(0, 0, zb);
+  });
+  const leaf = mergeGeometries(tiers.map((g) => g.toNonIndexed()));
+  const balls = [], bulbs = [], cc = new THREE.Color();
+  const paint = (g, color) => { const n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) a.set(color, 3 * i); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; };
+  for (let i = 0; i < 30; i++) {
+    const z = -7.5 - rnd() * 24, th = rnd() * Math.PI * 2, r = treeR(z) * 0.92 + 0.3;
+    cc.set(f.orn[i % f.orn.length]);
+    balls.push(paint(new THREE.SphereGeometry(0.62, 10, 8).translate(r * Math.cos(th), r * Math.sin(th), z), [cc.r, cc.g, cc.b]));
+  }
+  for (let i = 0; i < 52; i++) {
+    const v = i / 52, z = -7.2 - v * 25.5, th = v * Math.PI * 2 * 4.5, r = treeR(z) * 0.9 + 0.35;
+    bulbs.push(paint(new THREE.SphereGeometry(0.26, 6, 5).translate(r * Math.cos(th), r * Math.sin(th), z), f.bulb[i % f.bulb.length]));
+  }
+  const sh = new THREE.Shape();
+  for (let i = 0; i < 10; i++) { const a = Math.PI / 2 + i * Math.PI / 5, R = i % 2 ? 0.82 : 2.05; if (i) sh.lineTo(R * Math.cos(a), R * Math.sin(a)); else sh.moveTo(R * Math.cos(a), R * Math.sin(a)); }
+  const star = new THREE.ExtrudeGeometry(sh, { depth: 0.5, bevelEnabled: true, bevelThickness: 0.15, bevelSize: 0.12, bevelSegments: 1 }).translate(0, 0, -0.25);
+  star.rotateX(-Math.PI / 2).translate(0, 0, -35.85);
+  const star2 = mergeGeometries([star, star.clone().rotateZ(Math.PI / 2)]);   // two crossed, so it reads as a star from every side
+  return (treeGeo[f.k] = { trunk, leaf, orn: mergeGeometries(balls), bulb: mergeGeometries(bulbs), star: star2 });
+}
+function makeTree(fi) {
+  const f = TREE_KINDS[fi % TREE_KINDS.length], P = treeParts(f);
+  treeMat = treeMat || { trunk: new THREE.MeshStandardMaterial({ color: 0x5a3c25, roughness: 1 }), leaf: new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.92 }),
+    orn: new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.2, metalness: 0.5, envMapIntensity: 1.4 }),
+    bulb: new THREE.MeshBasicMaterial({ color: 0xffffff, vertexColors: true }),
+    star: new THREE.MeshStandardMaterial({ color: 0xffd34a, emissive: 0xffb020, emissiveIntensity: 1.5, roughness: 0.3, metalness: 0.5 }) };
+  const grp = new THREE.Group();
+  for (const [g, m, sh] of [[P.trunk, treeMat.trunk, 1], [P.leaf, treeMat.leaf, 1], [P.orn, treeMat.orn, 0], [P.bulb, treeMat.bulb, 0], [P.star, treeMat.star, 1]]) {
+    const ms = new THREE.Mesh(g, m); ms.castShadow = !!sh; ms.receiveShadow = !PHONE && !!sh; grp.add(ms);
+  }
+  grp.userData.flavor = f.k;
+  return grp;
+}
+function treeImpactFx(at, k) {
+  // snow shaken off the branches
+  for (let i = 0; i < 30 + 20 * k; i++) snowBit(at.x + rand(-5, 5) * k, at.y + rand(1, 14) * k, at.z + rand(-5, 5) * k, rand(-8, 8), rand(2, 10), rand(-8, 8), rand(0.8, 1.8));
+  SFX.jingle(8, 0.35, 0.05);
+}
+function treeSettle(s) { puff(s.anchor.clone().add(_v.set(0, 1, 0)), 12 + 6 * s.k, 2 * s.k, 4); treeImpactFx(s.anchor, s.k * 0.6); }
+
+// ---- 눈사람 (운석 자리): a giant snowman tumbles out of the sky; it bursts into a cloud of snow and its hat and carrot fly off
+let smM = null;
+function snowmanMats() {
+  return smM || (smM = { coal: new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.75 }), carrot: new THREE.MeshStandardMaterial({ color: 0xe8711a, roughness: 0.6 }),
+    stick: new THREE.MeshStandardMaterial({ color: 0x4a3322, roughness: 1 }), red: new THREE.MeshStandardMaterial({ color: 0xc8102e, roughness: 0.8 }),
+    hat: new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.55 }) });
+}
+function snowHat() {
+  const M = snowmanMats(), g = new THREE.Group();
+  const add = (geo, m, y) => { const ms = new THREE.Mesh(geo, m); ms.position.y = y; ms.castShadow = true; g.add(ms); };
+  add(new THREE.CylinderGeometry(3.4, 3.4, 0.35, 28), M.hat, 0);
+  add(new THREE.CylinderGeometry(2.2, 2.3, 3.3, 24), M.hat, 1.8);
+  add(new THREE.CylinderGeometry(2.33, 2.33, 0.7, 24), M.red, 0.6);
+  return g;
+}
+const snowCarrot = () => { const m = new THREE.Mesh(new THREE.ConeGeometry(0.75, 4.2, 12).rotateX(Math.PI / 2).translate(0, 0, 2.1), snowmanMats().carrot); m.castShadow = true; return m; };
+function makeSnowman() {
+  const M = snowmanMats(), body = new THREE.Group();
+  const add = (geo, m, x, y, z, par = body) => { const ms = new THREE.Mesh(geo, m); ms.position.set(x, y, z); ms.castShadow = true; par.add(ms); return ms; };
+  for (const [r, y] of [[6, -7], [4.3, 2.2], [3, 9.2]]) add(snowballGeo(), snowMat, 0, y, 0).scale.setScalar(r / 1.9);
+  const coal = new THREE.SphereGeometry(0.42, 10, 8);
+  for (const s of [-1, 1]) add(coal, M.coal, s * 1.1, 10.1, 2.55);
+  for (const [y, z] of [[4.4, 3.65], [2.4, 4.25], [0.4, 4.05]]) add(coal, M.coal, 0, y, z).scale.setScalar(1.3);
+  const nose = snowCarrot(); nose.position.set(0, 9.3, 2.8); body.add(nose);
+  const hat = snowHat(); hat.position.set(0, 11.7, 0); hat.rotation.z = 0.12; body.add(hat);
+  add(new THREE.TorusGeometry(3.05, 0.75, 10, 28).rotateX(Math.PI / 2), M.red, 0, 6.6, 0);
+  add(new THREE.BoxGeometry(1.4, 4.2, 0.5), M.red, 1.8, 4.6, 3.1).rotation.z = 0.2;
+  for (const s of [-1, 1]) {
+    const arm = new THREE.Group(); arm.position.set(s * 3.9, 3.4, 0); arm.rotation.z = s * -0.95; body.add(arm);
+    add(new THREE.CylinderGeometry(0.2, 0.3, 7.5, 6).translate(0, 3.75, 0), M.stick, 0, 0, 0, arm);
+    add(new THREE.CylinderGeometry(0.1, 0.16, 2.4, 5).translate(0, 1.2, 0), M.stick, 0, 5.6, 0, arm).rotation.z = s * 0.7;
+    add(new THREE.CylinderGeometry(0.1, 0.16, 2.2, 5).translate(0, 1.1, 0), M.stick, 0, 6.4, 0, arm).rotation.z = -s * 0.5;
+  }
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: SOFT, color: new THREE.Color(0.55, 0.7, 1.0), transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending }));
+  glow.scale.setScalar(44);
+  const g = new THREE.Group(); g.add(body, glow); g.userData.rock = body;
+  return g;
+}
+function snowmanTrail(pos, motion) {
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: SOFT, color: new THREE.Color(1.3, 1.35, 1.45), transparent: true, opacity: 0.7, depthWrite: false }));
+  sp.position.copy(pos).addScaledVector(motion, -rand(8, 16)).add(_v.set(rand(-3, 3), rand(-3, 3), rand(-3, 3))); scene.add(sp);
+  fx.push({ obj: sp, t: 0, life: 0.8, kind: 'trail', update(e, t) { e.obj.scale.setScalar(6 + 16 * t); e.obj.material.opacity = 0.6 * (1 - t); } });
+  for (let i = 0; i < 4; i++) snowBit(pos.x + rand(-6, 6), pos.y + rand(-6, 6), pos.z + rand(-6, 6), -motion.x * 24 + rand(-6, 6), -motion.y * 24 + rand(-6, 6), -motion.z * 24 + rand(-6, 6), rand(0.5, 1.1));
+  emit(sparks, pos.x, pos.y, pos.z, -motion.x * 30 + rand(-8, 8), -motion.y * 30 + rand(-8, 8), -motion.z * 30 + rand(-8, 8), rand(0.3, 0.7), 0.75, 0.88, 1.2, 1);
+}
+// a prop thrown off by the impact: flies, spins, lands and lies there until it fades
+function flyProp(obj, at, vel, life = 7) {
+  const v = vel.clone(), spin = new THREE.Vector3(rand(-5, 5), rand(-5, 5), rand(-5, 5));
+  obj.position.copy(at); scene.add(obj);
+  let last = 0, down = false;
+  fx.push({ obj, t: 0, life, kind: 'prop', update(e, t) {
+    const dt = e.t - last; last = e.t;
+    if (!down) {
+      v.y -= 30 * dt; obj.position.addScaledVector(v, dt);
+      obj.rotation.x += spin.x * dt; obj.rotation.y += spin.y * dt; obj.rotation.z += spin.z * dt;
+      const gy = groundY(obj.position.x, obj.position.z);
+      if (obj.position.y < gy + 1 && v.y < 0) { down = true; obj.position.y = gy + 1; puff(obj.position, 16, 2, 4); SFX.thump(); }
+    }
+    if (t > 0.85) obj.scale.setScalar(Math.max(0.01, (1 - t) / 0.15));
+  } });
+}
+function snowmanImpact(c) {
+  beginAct('meteor', c);
+  curAct.pre = ['눈사람 낙하!']; curAct.bonus = 1200;
+  whiteEl.style.transition = 'none'; whiteEl.style.opacity = 0.5;
+  requestAnimationFrame(() => requestAnimationFrame(() => { whiteEl.style.transition = 'opacity 1.2s ease-out'; whiteEl.style.opacity = 0; }));
+  expoBoost = 0.9;
+  flashLight.color.set(0xdce8ff); flashLight.position.copy(c).add(new THREE.Vector3(0, 20, 0));
+  fx.push({ obj: flashLight, t: 0, life: 1.4, kind: 'flash', peak: 16000 });
+  blastDamage(c, { RV: 24, RB: 92, budget: Math.min(COARSE ? 300 : 650, Math.max(COARSE ? 150 : 250, MAXDYN - dyn.size)), speed: 18, speedF: 40, up: 10, upF: 18, push: 30, trees: 110 });
+  digAt(c.x, c.z, 46, 22 + 0.45 * depthAt(c.x, c.z));
+  capPieces();
+  // a dome of powder snow instead of a fireball
+  for (let i = 0; i < 10; i++) {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: SOFT, color: new THREE.Color(1.45, 1.5, 1.6), transparent: true, opacity: 0.95, depthWrite: false }));
+    const o = new THREE.Vector3(rand(-14, 14), rand(4, 16), rand(-14, 14)); sp.position.copy(c).add(o); scene.add(sp);
+    const g = rand(60, 95);
+    fx.push({ obj: sp, t: 0, life: rand(2.2, 3.2), kind: 'snowdome', update(e, t) { e.obj.scale.setScalar(10 + g * (1 - Math.exp(-e.t / 0.3))); e.obj.position.y = c.y + o.y + e.t * 9; e.obj.material.opacity = 0.95 * (1 - Math.pow(t, 1.3)); } });
+  }
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 96), new THREE.MeshBasicMaterial({ color: 0xf2f7ff, transparent: true, opacity: 0.75, depthWrite: false, side: THREE.DoubleSide }));
+  ring.rotation.x = -Math.PI / 2; ring.position.set(c.x, groundY(c.x, c.z) + 1.5, c.z); scene.add(ring);
+  fx.push({ obj: ring, t: 0, life: 1.5, kind: 'ring', grow: 320 });
+  for (let i = 0; i < 160; i++) { const s2 = rand(0.8, 0.92); emit(smoke, c.x + rand(-20, 20), c.y + rand(0, 10), c.z + rand(-20, 20), rand(-16, 16), rand(4, 18), rand(-16, 16), rand(2.5, 5), s2, s2 * 1.02, s2 * 1.06, rand(0.5, 0.75)); }
+  for (let i = 0; i < (PHONE ? 500 : 900); i++) snowBit(c.x + rand(-8, 8), c.y + rand(0, 8), c.z + rand(-8, 8), rand(-60, 60), rand(10, 62), rand(-60, 60), rand(1.4, 3.4));
+  for (let i = 0; i < 80; i++) emit(sparks, c.x, c.y + 3, c.z, rand(-50, 50), rand(10, 50), rand(-50, 50), rand(0.5, 1.2), 0.8, 0.9, 1.2, 1);
+  for (let i = 0; i < 90; i++) emit(dust, c.x + rand(-10, 10), c.y + rand(0, 6), c.z + rand(-10, 10), rand(-25, 25), rand(5, 30), rand(-25, 25), rand(1.2, 2.8), 0.42, 0.32, 0.22, 0.6);
+  const up = new THREE.Vector3(0, 1, 0);
+  flyProp(snowHat(), c.clone().add(_v.set(0, 14, 0)), new THREE.Vector3(rand(-12, 12), 44, rand(-12, 12)));
+  const nose = snowCarrot(); flyProp(nose, c.clone().add(_v.set(0, 10, 0)), new THREE.Vector3(rand(-18, 18), 36, rand(-18, 18)).addScaledVector(up, 0));
+  SFX.boom(80); SFX.xmasPop('snow', 60); SFX.crumble(60);
+  addShake(1, c);
+  const near = B.filter((b) => b.n).sort((a, b) => Math.hypot(a.cx - c.x, a.cz - c.z) - Math.hypot(b.cx - c.x, b.cz - c.z))[0];
+  banner('눈사람 낙하', `떨어진 곳: ${near ? near.n + ' 근처' : '한복판'}`);
+  endAct();
+}
+
+// ---- sounds: sleigh bells, hooves, soft snow and breaking glass (synthesised like the rest)
+Object.assign(SFX, {
+  jingle(n = 10, dur = 0.5, g = 0.08) {
+    const c = audio(); if (!c) return; const t = c.currentTime;
+    for (let i = 0; i < n; i++) {
+      const tt = t + Math.random() * dur, f = 2500 + Math.random() * 1900, gg = g * (0.5 + Math.random() * 0.5);
+      tone(c, tt, 0.24, 'sine', f, f * 0.996, gg, 0.25, 0.001);
+      tone(c, tt, 0.14, 'sine', f * 2.76, f * 2.75, gg * 0.4, 0.25, 0.001);
+      tone(c, tt, 0.07, 'triangle', f * 5.4, f * 5.38, gg * 0.18, 0.2, 0.001);
+    }
+    noise(c, t, dur + 0.12, 'highpass', 7500, 6500, g * 0.5, 0.2, 0.7);
+  },
+  rush(dur, speed, run) {
+    const c = audio(); if (!c) return; const t = c.currentTime;
+    const per = 1 / Math.min(4.2, Math.max(1.8, speed / 50));
+    if (run) for (let s = 0; s < dur; s += per) for (const o of [0, 0.07, 0.16]) {
+      const tt = t + s + o + Math.random() * 0.01;
+      tone(c, tt, 0.2, 'sine', 120, 42, 0.42, 0.08); noise(c, tt, 0.1, 'lowpass', 1000, 180, 0.3, 0.1);
+    }
+    else { tone(c, t + dur * 0.75, 0.6, 'sine', 90, 30, 0.9, 0.1); noise(c, t + dur * 0.75, 0.5, 'lowpass', 1600, 90, 0.7, 0.3); }
+    for (let s = 0; s < dur; s += 0.28) this.jingleAt(c, t + s, 5, 0.12, 0.06);
+    noise(c, t, dur, 'lowpass', 400, 160, 0.35, 0.3);
+  },
+  jingleAt(c, t0, n, dur, g) {
+    for (let i = 0; i < n; i++) { const tt = t0 + Math.random() * dur, f = 2600 + Math.random() * 1700; tone(c, tt, 0.2, 'sine', f, f * 0.996, g, 0.25, 0.001); tone(c, tt, 0.12, 'sine', f * 2.76, f * 2.75, g * 0.4, 0.25, 0.001); }
+  },
+  swoop(dur, up) {
+    const c = audio(); if (!c) return; const t = c.currentTime;
+    noise(c, t, dur, 'bandpass', up ? 500 : 2600, up ? 2600 : 420, 0.28, 0.35, 1.4);
+  },
+  xmasPop(k, dist = 300) {
+    const c = audio(); if (!c) return; const t = c.currentTime;
+    const kk = Math.min(1, Math.max(0.35, 420 / (dist + 120)));
+    noise(c, t, 0.9, 'lowpass', 1300 * kk + 300, 80, 0.85 * kk, 0.45);
+    tone(c, t, 0.7, 'sine', 74, 28, 0.75 * kk, 0.1);
+    if (k === 'snow') { crackle(c, t + 0.02, 0.6, 46, 3000, 0.16 * kk); noise(c, t, 0.35, 'bandpass', 2400, 700, 0.3 * kk, 0.3, 1.2); return; }
+    for (let i = 0; i < 34; i++) { const tt = t + Math.random() * 0.35, f = 3000 + Math.random() * 6000; tone(c, tt, 0.04 + Math.random() * 0.12, 'sine', f, f * 0.9, 0.05 * kk, 0.3, 0.001); }
+    noise(c, t, 0.4, 'highpass', 5000, 3000, 0.4 * kk, 0.3);
+    tone(c, t + 0.06, 1.1, 'sine', 1568, 1568, 0.06, 0.5); tone(c, t + 0.06, 1.1, 'sine', 2349, 2349, 0.035, 0.5);
+  },
+  candy() { const c = audio(); if (!c) return; crackle(c, c.currentTime, 0.14, 16, 4200, 0.16); },
+});
+
+// ---- the weapon bar: new names, icons and colours (the HTML keeps the old ones for ?xmas=0)
+if (XMAS) {
+  const ICON = {
+    bomb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9.3" cy="14.7" r="6.6" fill="currentColor" stroke="none"></circle><circle cx="18.2" cy="8.4" r="3.5"></circle><path d="M18.2 4.9V3M16.8 3h2.8"></path></svg>',
+    bat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true"><path d="M8 21.6V8.6a4 4 0 0 1 8 0v1.9" stroke-width="3.6"></path><path d="M6.3 18.4l3.4-1.9M6.3 13.6l3.4-1.9M6.6 8.6 9.6 6.8M11.4 4.7l1.6 2.8M15.6 6.3l-2.9 1.6" stroke="var(--hud-2, #262420)" stroke-width="1.1"></path></svg>',
+    laser: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.4 8.4C6.3 7.3 4.9 5.3 4.7 2.7M5.2 5.5 2.7 5.6M6.9 7.3 5.5 8.8M15.6 8.4c2.1-1.1 3.5-3.1 3.7-5.7M18.8 5.5l2.5.1M17.1 7.3l1.4 1.5"></path><path d="M8.2 10.7c0-1.7 1.7-2.7 3.8-2.7s3.8 1 3.8 2.7c0 2.1-1.3 4.2-2.3 6.2h-3c-1-2-2.3-4.1-2.3-6.2Z"></path><path d="M6.2 10.3 8.2 11M17.8 10.3 15.8 11"></path><circle class="nose" cx="12" cy="18.6" r="2.4" stroke="none"></circle></svg>',
+    meteor: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="17" r="5"></circle><circle cx="12" cy="9" r="3.4"></circle><path d="M8.2 5.7h7.6M9.6 5.6V2.4h4.8v3.2" fill="currentColor"></path><path d="M7.3 13.6 3.4 11.2M16.7 13.6l3.9-2.4"></path><circle cx="12" cy="15.6" r=".6" fill="currentColor"></circle><circle cx="12" cy="18.2" r=".6" fill="currentColor"></circle></svg>',
+    pepero: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g transform="rotate(-18 12 20)"><path d="M12 4.6 8 9.6h2.3L6.7 14.3h2.7L5.8 19h12.4l-3.6-4.7h2.7l-3.6-4.7H16Z" fill="currentColor" stroke="none"></path><path d="M12 19v2.6"></path><path d="m12 1.1.7 1.4 1.5.2-1.1 1 .3 1.5-1.4-.7-1.4.7.3-1.5-1.1-1 1.5-.2Z" fill="currentColor" stroke="none"></path></g><path d="M3 21.8h18"></path></svg>',
+  };
+  const NAME = { bomb: ['눈덩이', '트리 장식도'], bat: ['캔디케인', '멀리 날림'], laser: ['루돌프', '끌어서 돌진'], meteor: ['눈사람', '하늘에서'], pepero: ['트리', '꽂아 세움'] };
+  for (const [t, [tn, td]] of Object.entries(NAME)) {
+    const el = document.querySelector(`.tool[data-tool="${t}"]`);
+    if (!el) continue;
+    el.querySelector('.tn').textContent = tn; el.querySelector('.td').textContent = td;
+    el.querySelector('svg').outerHTML = ICON[t];
+  }
+  const lb = (id, s) => { const l = document.querySelector(`label[for="${id}"]`); if (l) l.textContent = s; };
+  lb('bat-size', '캔디케인 크기'); lb('pep-size', '트리 크기');
+  // the NEW badge moves to 루돌프
+  const badge = document.querySelector('.tool .new'), deer = document.querySelector('.tool[data-tool="laser"]');
+  if (deer) { const b = badge || Object.assign(document.createElement('i'), { className: 'new' }); b.setAttribute('aria-hidden', 'true'); b.textContent = 'NEW'; deer.appendChild(b); }
+  const st = document.createElement('style');
+  st.textContent = `.tool[data-tool="laser"] .nose { fill: #ff4a4a; }
+.tool[data-tool="laser"][aria-checked="true"] { background: #d3263a; border-color: #d3263a; color: #fff; }
+.tool[data-tool="laser"][aria-checked="true"] .nose { fill: #fff; }
+.tool[data-tool="pepero"][aria-checked="true"] { background: #2f8a4c; border-color: #2f8a4c; color: #fff; }
+.tool[aria-checked="true"] svg path[stroke^="var"] { stroke: var(--hot); }
+.tool[data-tool="bat"][aria-checked="true"] svg path[stroke^="var"] { stroke: var(--hot); }
+.tool .new { background: #d3263a; }
+@media (max-width: 720px) { .tool[data-tool="bat"] .tn { letter-spacing: -0.06em; } }`;
+  document.head.appendChild(st);
+  // settings: 눈 내림 on / off
+  const nightBtn = $('t-night');
+  if (nightBtn && snowFall) {
+    const b = Object.assign(document.createElement('button'), { className: 'opt', id: 't-snow', type: 'button', textContent: '눈 내림' });
+    b.setAttribute('aria-pressed', String(snowFall.on));
+    b.addEventListener('click', () => {
+      snowFall.set(!snowFall.on); b.setAttribute('aria-pressed', String(snowFall.on));
+      try { localStorage.setItem('smash-snow', snowFall.on ? '1' : '0'); } catch (e) { /* storage blocked */ }
+    });
+    nightBtn.after(b);
+  }
+}
+
 // ============ tools
 const TOOLS = { bomb: { r: 16 }, bat: { r: 6 }, laser: { r: 1.8 }, meteor: { r: 92 }, quake: { r: 260 }, nuke: { r: 380 }, pepero: { r: 3.4 } };
 let tool = 'bomb';
@@ -2129,13 +2814,14 @@ const bombs = [];
 const bombGeo = new THREE.SphereGeometry(1.4, 16, 12), bombMat = new THREE.MeshStandardMaterial({ color: 0x1d1f22, roughness: 0.4, metalness: 0.4 });
 const fuseMat = new THREE.SpriteMaterial({ map: FIRE, color: new THREE.Color(3, 1.6, 0.6), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
 function throwBomb(pt) {
-  const m = new THREE.Mesh(bombGeo, bombMat); m.castShadow = true;
-  const fuse = new THREE.Sprite(fuseMat); fuse.scale.setScalar(2.4); fuse.position.y = 1.7; m.add(fuse);
+  const xb = XMAS ? makeXmasBomb() : null;
+  const m = xb ? xb.m : new THREE.Mesh(bombGeo, bombMat); m.castShadow = true;
+  if (!xb) { const fuse = new THREE.Sprite(fuseMat); fuse.scale.setScalar(2.4); fuse.position.y = 1.7; m.add(fuse); }
   const look = new THREE.Vector3(); camera.getWorldDirection(look);
   const right = new THREE.Vector3().crossVectors(look, camera.up).normalize();
   const start = camera.position.clone().addScaledVector(look, 7).addScaledVector(right, rand(1.5, 3)).add(new THREE.Vector3(0, -3, 0));
   const d = start.distanceTo(pt);
-  bombs.push({ m, start, target: pt.clone(), t: 0, T: Math.min(1.6, 0.4 + d / 480), arc: d * rand(0.02, 0.035) + rand(2, 4),
+  bombs.push({ m, kind: xb && xb.kind, start, target: pt.clone(), t: 0, T: Math.min(1.6, 0.4 + d / 480), arc: d * rand(0.02, 0.035) + rand(2, 4),
     spin: new THREE.Vector3(rand(-9, 9), rand(-9, 9), rand(-9, 9)) });
   m.position.copy(start);
   scene.add(m);
@@ -2148,11 +2834,11 @@ function updateBombs(dt) {
     const u = Math.min(1, bo.t / bo.T);
     bo.m.position.lerpVectors(bo.start, bo.target, u).y += bo.arc * 4 * u * (1 - u);
     bo.m.rotation.x += bo.spin.x * dt; bo.m.rotation.y += bo.spin.y * dt; bo.m.rotation.z += bo.spin.z * dt;
-    if (Math.random() < 0.6) emit(sparks, bo.m.position.x, bo.m.position.y + 1.5, bo.m.position.z, rand(-3, 3), rand(0, 4), rand(-3, 3), rand(0.15, 0.35), 1, rand(0.6, 0.85), 0.3, 1);
-    if (u >= 1) { scene.remove(bo.m); bombs.splice(i, 1); explode(bo.target); }
+    if (bo.kind) xmasTrail(bo); else if (Math.random() < 0.6) emit(sparks, bo.m.position.x, bo.m.position.y + 1.5, bo.m.position.z, rand(-3, 3), rand(0, 4), rand(-3, 3), rand(0.15, 0.35), 1, rand(0.6, 0.85), 0.3, 1);
+    if (u >= 1) { scene.remove(bo.m); bombs.splice(i, 1); explode(bo.target, bo.kind); }
   }
 }
-function explode(c) {
+function explode(c, kind) {
   beginAct('bomb', c);
   const R = TOOLS.bomb.r;
   let fell = 0;
@@ -2198,8 +2884,8 @@ function explode(c) {
   if (gone) placeTrees();
   for (const b of touched) { wakeNear(b.x0, b.x1, b.z0, b.z1); rebuildStatic(b); }
   if (c.y - groundY(c.x, c.z) < R * 0.6) digAt(c.x, c.z, R * 0.9, 6 + 0.45 * depthAt(c.x, c.z));
-  fireball(c);
-  SFX.boom(camera.position.distanceTo(c)); if (fell > 3) SFX.crumble(fell);
+  if (kind) { xmasBurst(c, kind); SFX.xmasPop(kind.k, camera.position.distanceTo(c)); } else { fireball(c); SFX.boom(camera.position.distanceTo(c)); }
+  if (fell > 3) SFX.crumble(fell);
   addShake(0.95, c);
   capPieces();
   endAct();
@@ -2209,7 +2895,7 @@ function explode(c) {
 const PEP_L = 34, PEP_LC = 25.4, PEP_RC = 0.95, PEP_RB = 0.7;   // length, dipped length, coat and biscuit radius (m) at size ×1
 const PEP_PIERCE = 2;   // from this size up the stick goes right through a building and brings it down
 let pepSize = 1;
-const PEP_FLAVORS = [
+const PEP_FLAVORS = XMAS ? TREE_KINDS : [
   { k: 'choco', n: '초코', coat: 0x3b1d10, rough: 0.32 },
   { k: 'almond', n: '아몬드', coat: 0x4a2716, rough: 0.48, bits: 0xd9aa6c, bump: 0.38, nb: 120, w: 0.3 },
   { k: 'berry', n: '딸기', coat: 0xf47aa6, rough: 0.42, bits: 0xd23c6c, bump: 0.05, nb: 90, w: 0.22 },
@@ -2263,6 +2949,7 @@ const pepBiscuitGeo = (() => {
 const pepBiscuitMat = new THREE.MeshStandardMaterial({ color: 0xd99d58, roughness: 0.86 });
 const pepCoatMat = {};
 function makePepero(fi) {
+  if (XMAS) return makeTree(fi);
   const f = PEP_FLAVORS[fi % PEP_FLAVORS.length];
   pepCoatMat[f.k] = pepCoatMat[f.k] || new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: f.rough, metalness: 0 });
   const grp = new THREE.Group();
@@ -2396,20 +3083,29 @@ function pepImpact(j) {
   for (const b of touched) { fell += support(b); wakeNear(b.x0, b.x1, b.z0, b.z1); rebuildStatic(b); }
   // chocolate and concrete dust where it went in; a small crater where it meets the ground
   const cc = new THREE.Color(f.coat);
+  if (XMAS) treeImpactFx(entry, k);
   for (let i = 0; i < 10 + 8 * k; i++) emit(dust, entry.x + rand(-1, 1) * k, entry.y + rand(-1, 1) * k, entry.z + rand(-1, 1) * k, -dir.x * rand(2, 8) + rand(-3, 3), rand(1, 6), -dir.z * rand(2, 8) + rand(-3, 3), rand(0.6, 1.3), cc.r, cc.g, cc.b, rand(0.5, 0.8));
   if (!inGround) puff(entry, 14 + 6 * k, 1.5 * k, 6);
   if (grounded) {
     puff(anchor, 18 + 8 * k, 2 * k, 5);
     if (anchor.y - groundY(anchor.x, anchor.z) < 3) digAt(anchor.x, anchor.z, 2 + 1.2 * k, 0.8 + 0.6 * k);
   }
-  if (through && skewered.length) { curAct.pre = ['관통!']; if (skewered.length > 1) curAct.pre.push(`꼬치 ×${skewered.length}`); curAct.bonus = 300 * skewered.length; }
+  if (through && skewered.length) { curAct.pre = ['관통!']; if (skewered.length > 1) curAct.pre.push(`${XMAS ? '줄줄이' : '꼬치'} ×${skewered.length}`); curAct.bonus = 300 * skewered.length; }
   hitStop = through ? 0.09 : 0.05;
   addShake(0.3 + 0.2 * k, entry);
   SFX.pierce(k, through && skewered.length > 0); if (fell > 3) SFX.crumble(Math.min(80, fell));
   const axis = new THREE.Vector3().crossVectors(dir, Math.abs(dir.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0)).normalize();
-  peps.push({ m: j.m, k, fi: j.fi, state: 'slide', t: 0, T: through ? Math.min(0.3, 0.06 + reach / 600) : 0.07, from: entry, to: tipEnd, dir, anchor, emb: tipEnd.distanceTo(anchor), axis, q0: j.m.quaternion.clone(), vel: new THREE.Vector3() });
+  // 땅에 바로 꽂힌 트리는 똑바로 선다: the rotation that turns the stick straight down, about where it went in
+  let up = null;
+  if (XMAS && inGround) {
+    const rq = new THREE.Quaternion().setFromUnitVectors(dir, _pdown), ax = new THREE.Vector3().crossVectors(dir, _pdown);
+    up = { rq, q: rq.clone().multiply(j.m.quaternion), to: tipEnd.clone().sub(anchor).applyQuaternion(rq).add(anchor), axis: ax.lengthSq() > 1e-6 ? ax.normalize() : axis.clone() };
+  }
+  peps.push({ m: j.m, k, fi: j.fi, up, state: 'slide', t: 0, T: through ? Math.min(0.3, 0.06 + reach / 600) : 0.07, from: entry, to: tipEnd, dir, anchor, emb: tipEnd.distanceTo(anchor), axis, q0: j.m.quaternion.clone(), vel: new THREE.Vector3() });
   while (peps.length > MAXPEP) scene.remove(peps.shift().m);
-  if (++pepThrown === 11) banner('빼빼로 ×11', '11월 11일엔 캠퍼스에 꽂는다');
+  ++pepThrown;
+  if (!XMAS && pepThrown === 11) banner('빼빼로 ×11', '11월 11일엔 캠퍼스에 꽂는다');
+  if (XMAS && pepThrown === 25) banner('트리 ×25', '12월 25일엔 캠퍼스에 트리를');
   capPieces();
   endAct();
 }
@@ -2432,7 +3128,7 @@ function pepLay(s) {
   const fwd = _pa.set(0, 0, 1).applyQuaternion(s.m.quaternion); fwd.y = 0;
   if (fwd.lengthSq() < 1e-4) fwd.set(1, 0, 0);
   fwd.normalize();
-  const half = 0.5 * PEP_L * s.k, rr = PEP_RC * s.k;
+  const half = 0.5 * PEP_L * s.k, rr = (XMAS ? 3.4 : PEP_RC) * s.k;
   const mid = s.m.position.clone().addScaledVector(fwd, -half);
   const tip = mid.clone().addScaledVector(fwd, half), tail = mid.clone().addScaledVector(fwd, -half);
   tip.y = groundY(tip.x, tip.z) + rr; tail.y = groundY(tail.x, tail.z) + rr;
@@ -2450,7 +3146,13 @@ function updatePeps(dt) {
     if (s.state === 'slide') {
       const u = Math.min(1, s.t / s.T);
       s.m.position.lerpVectors(s.from, s.to, 1 - (1 - u) * (1 - u));
-      if (u >= 1) { s.state = 'quiver'; s.t = 0; }
+      if (u >= 1) { s.state = s.up ? 'rise' : 'quiver'; s.t = 0; }
+    } else if (s.state === 'rise') {
+      const u = Math.min(1, s.t / 0.5), e = 1 - Math.pow(1 - u, 3);
+      _pq.identity().slerp(s.up.rq, e);
+      s.m.quaternion.copy(_pq).multiply(s.q0);
+      s.m.position.copy(s.to).sub(s.anchor).applyQuaternion(_pq).add(s.anchor);
+      if (u >= 1) { s.q0.copy(s.up.q); s.to = s.up.to.clone(); s.dir.copy(_pdown); s.axis.copy(s.up.axis); s.m.quaternion.copy(s.q0); s.m.position.copy(s.to); s.up = null; s.state = 'quiver'; s.t = 0; treeSettle(s); }
     } else if (s.state === 'quiver') {
       // 부르르: the free end shakes about the point where it went in
       const a = 0.08 * Math.exp(-4.2 * s.t) * Math.sin(46 * s.t) / Math.sqrt(s.k);
@@ -2465,7 +3167,7 @@ function updatePeps(dt) {
       const flat = _pb.set(fwd.x, 0, fwd.z); if (flat.lengthSq() < 1e-4) flat.set(1, 0, 0);
       s.m.quaternion.rotateTowards(_pq.setFromUnitVectors(_pz, flat.normalize()), 1.6 * dt);
       const mid = _pc.copy(fwd).multiplyScalar(-0.5 * PEP_L * s.k).add(s.m.position);
-      if (mid.y < groundY(mid.x, mid.z) + PEP_RC * s.k + 0.3 || s.t > 6) pepLay(s);
+      if (mid.y < groundY(mid.x, mid.z) + (XMAS ? 3.4 : PEP_RC) * s.k + 0.3 || s.t > 6) pepLay(s);
     }
   }
   pepCheckT -= dt;
@@ -2477,7 +3179,7 @@ function updatePeps(dt) {
 }
 const pepBusy = () => javs.length > 0 || peps.some((s) => s.state !== 'stuck' && s.state !== 'down');
 function pepSnap() {
-  return peps.map((s) => { const rest = s.state === 'slide' || s.state === 'quiver'; return [s, rest ? 'stuck' : s.state, (rest ? s.to : s.m.position).clone(), (rest ? s.q0 : s.m.quaternion).clone()]; });
+  return peps.map((s) => { const rest = s.state === 'slide' || s.state === 'quiver' || s.state === 'rise', U = rest && s.up; return [s, rest ? 'stuck' : s.state, (U ? s.up.to : rest ? s.to : s.m.position).clone(), (U ? s.up.q : rest ? s.q0 : s.m.quaternion).clone()]; });
 }
 function pepRestore(list) {
   for (const s of peps) scene.remove(s.m);
@@ -2490,6 +3192,7 @@ function pepRestore(list) {
 const batMat = new THREE.MeshStandardMaterial({ color: 0xc8955a, roughness: 0.55 });
 const gripMat = new THREE.MeshStandardMaterial({ color: 0x1b1b1d, roughness: 0.85 });
 function makeBat() {
+  if (XMAS) return makeCane();
   const inner = new THREE.Group();
   const add = (geo, mat, y) => { const m = new THREE.Mesh(geo, mat); m.position.y = y; m.castShadow = true; inner.add(m); };
   add(new THREE.CylinderGeometry(0.42, 0.16, 3.6, 18), batMat, 2.7);
@@ -2520,7 +3223,7 @@ function drawTrail(tr, now) {
   for (let i = 0; i < n; i++) {
     const sm = tr.samples[i], al = Math.max(0, 1 - (now - sm.t) / 0.32);
     pos.setXYZ(2 * i, sm.a.x, sm.a.y, sm.a.z); pos.setXYZ(2 * i + 1, sm.b.x, sm.b.y, sm.b.z);
-    col.setXYZW(2 * i, 1, 0.92, 0.8, 0.08 * al); col.setXYZW(2 * i + 1, 1, 1, 1, 0.75 * al);
+    if (XMAS) { col.setXYZW(2 * i, 1, 0.2, 0.25, 0.14 * al); col.setXYZW(2 * i + 1, 1, 1, 1, 0.7 * al); } else { col.setXYZW(2 * i, 1, 0.92, 0.8, 0.08 * al); col.setXYZW(2 * i + 1, 1, 1, 1, 0.75 * al); }
   }
   pos.needsUpdate = true; col.needsUpdate = true;
   tr.mesh.geometry.setDrawRange(0, Math.max(0, n - 1) * 6);
@@ -2607,6 +3310,7 @@ function batHit(hit, fwd, lift = 0.4) {
     swings.push({ t: 0, pieces: flew.map((q) => [q, q.pos.x, q.pos.z]) });
     SFX.bat(batSize); addShake(0.38 * Math.sqrt(batSize), hit.point);
     puff(hit.point, 30, 1, 4);
+    if (XMAS) { SFX.candy(); candyBits(hit.point); }
   } else {
     for (let i = 0; i < 26; i++) emit(dust, hit.point.x + rand(-1.5, 1.5), hit.point.y + rand(0, 1), hit.point.z + rand(-1.5, 1.5), rand(-3, 3), rand(1, 5), rand(-3, 3), rand(0.8, 1.8), 0.42, 0.33, 0.24, 0.6);
   }
@@ -2676,6 +3380,7 @@ function makeMolten(path) {
   return m;
 }
 function fireLaser(pts) {
+  if (XMAS) return fireRush(pts);
   pushHistory();
   const path = [pts[0].clone()];
   for (let i = 1; i < pts.length; i++) {
@@ -2694,7 +3399,7 @@ function fireLaser(pts) {
 }
 const pieceVol = (q) => 8 * q.def.hx * q.def.hy * q.def.hz;
 function laserCut(pt, L, now, nX, nZ) {
-  const KERF = 3.2, SIDE = 9;
+  const KERF = L.kerf || 3.2, SIDE = L.side || 9;
   const near = (r) => Math.hypot(Math.max(Math.abs(pt.x - r.pos.x) - r.def.hx, 0), Math.max(Math.abs(pt.z - r.pos.z) - r.def.hz, 0));
   for (const b of B) {
     if (!b.statics.size || pt.x < b.x0 - 12 || pt.x > b.x1 + 12 || pt.z < b.z0 - 12 || pt.z > b.z1 + 12) continue;
@@ -2749,6 +3454,7 @@ function beamRing(x, gy, z) {
 }
 function updateLaser(dt) {
   const L = laserBeam;
+  if (L.rush) return updateRush(dt);
   if (L.phase === 'charge') {
     L.ct += dt;
     const k = Math.min(1, L.ct / 0.6);
@@ -2808,6 +3514,7 @@ function updateLaser(dt) {
   if (k >= 1 && L.idx >= L.path.length) finishLaser();
 }
 function finishLaser() {
+  if (laserBeam.rush) return finishRush();
   const L = laserBeam; laserBeam = null; laserLine.material.color.set(0xff2a55);
   scene.remove(L.mesh); laserLight.intensity = 0;
   const prev = curAct; curAct = L.act;
@@ -3113,11 +3820,13 @@ function updateCine(rdt) {
     if (c.kind === 'meteor') {
       const motion = c.target.clone().sub(c.start).normalize();
       c.mesh.userData.rock.rotation.x += rdt * 2.6; c.mesh.userData.rock.rotation.z += rdt * 1.9;
+      if (XMAS) snowmanTrail(pos, motion); else {
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: FIRE, color: new THREE.Color(1.6, 0.6, 0.18), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
       sp.position.copy(pos).addScaledVector(motion, -rand(4, 10)); scene.add(sp);
       fx.push({ obj: sp, t: 0, life: 0.5, kind: 'trail', update(e, t) { e.obj.scale.setScalar(12 * (1 - t) + 3); e.obj.material.opacity = 0.8 * (1 - t); } });
       emit(smoke, pos.x + rand(-2, 2), pos.y + rand(-2, 2), pos.z + rand(-2, 2), rand(-1, 1), rand(0, 2), rand(-1, 1), rand(1.5, 3), 0.2, 0.17, 0.15, 0.5);
       emit(sparks, pos.x, pos.y, pos.z, -motion.x * 30 + rand(-8, 8), -motion.y * 30 + rand(-8, 8), -motion.z * 30 + rand(-8, 8), rand(0.3, 0.7), 1, rand(0.5, 0.8), 0.3, 1);
+      }
       follow = pos.clone().addScaledVector(motion, -46).add(new THREE.Vector3(0, 16, 0));
       followLook = pos.clone().addScaledVector(motion, 30);
     } else {
@@ -3236,6 +3945,7 @@ function blastDamage(c, o) {
   if (gone) placeTrees();
 }
 function makeMeteor() {
+  if (XMAS) return makeSnowman();
   const geo = mergeVertices(new THREE.IcosahedronGeometry(6, 2).deleteAttribute('normal').deleteAttribute('uv'));
   const pa = geo.attributes.position;
   for (let i = 0; i < pa.count; i++) {
@@ -3266,12 +3976,13 @@ function launchMeteor(target) {
   SFX.meteorFall();
 }
 function meteorImpact(c) {
+  if (XMAS) return snowmanImpact(c);
   beginAct('meteor', c);
   curAct.pre = ['운석 충돌!']; curAct.bonus = 1200;
   whiteEl.style.transition = 'none'; whiteEl.style.opacity = 0.55;
   requestAnimationFrame(() => requestAnimationFrame(() => { whiteEl.style.transition = 'opacity 1s ease-out'; whiteEl.style.opacity = 0; }));
   expoBoost = 1.4; fogHeat = 0.5;
-  flashLight.position.copy(c).add(new THREE.Vector3(0, 20, 0));
+  flashLight.color.set(0xffa860); flashLight.position.copy(c).add(new THREE.Vector3(0, 20, 0));
   fx.push({ obj: flashLight, t: 0, life: 1.4, kind: 'flash', peak: 30000 });
   blastDamage(c, { RV: 24, RB: 92, budget: Math.min(COARSE ? 300 : 650, Math.max(COARSE ? 150 : 250, MAXDYN - dyn.size)), speed: 18, speedF: 40, up: 10, upF: 18, push: 30, trees: 110 });
   digAt(c.x, c.z, 46, 22 + 0.45 * depthAt(c.x, c.z));
@@ -3298,7 +4009,7 @@ function detonate(c) {
   whiteEl.style.transition = 'none'; whiteEl.style.opacity = 1;
   requestAnimationFrame(() => requestAnimationFrame(() => { whiteEl.style.transition = 'opacity 2.6s ease-out'; whiteEl.style.opacity = 0; }));
   expoBoost = 3.2; fogHot.set(0xd8895a); fogHeat = 1;
-  flashLight.position.copy(c).add(new THREE.Vector3(0, 30, 0));
+  flashLight.color.set(0xffa860); flashLight.position.copy(c).add(new THREE.Vector3(0, 30, 0));
   fx.push({ obj: flashLight, t: 0, life: 3, kind: 'flash', peak: 180000 });
   blastDamage(c, { RV: 140, RB: 380, budget: Math.min(COARSE ? 600 : 1400, Math.max(COARSE ? 300 : 500, MAXDYN - dyn.size)), speed: 40, speedF: 90, up: 12, upF: 32, push: 70, trees: 580 });
   digAt(c.x, c.z, 160, 60 + 0.45 * depthAt(c.x, c.z));
@@ -3533,6 +4244,7 @@ function restore(s) {
   for (const e of fx) { if (e.kind === 'flash') e.obj.intensity = 0; else scene.remove(e.obj); }
   fx.length = 0;
   dust.n = smoke.n = sparks.n = 0;
+  if (SNOWBITS) SNOWBITS.n = 0;
   bannerQueue.length = 0; bannerOn = false; popsEl.replaceChildren();
 }
 const history = [];
@@ -3645,7 +4357,7 @@ stage.addEventListener('pointermove', (e) => {
   if (d > room) {   // 한도에 닿음: 남은 길이만큼만 잇고 선을 노랗게 바꿔 알린다
     if (room > 0.5) { const q = last.clone().lerp(h.point, room / d); q.y = groundY(q.x, q.z); laserDraw.pts.push(q); laserDraw.len = LASER_MAX; }
     laserDraw.full = true; laserLine.material.color.set(0xffc23a);
-    toast(`레이저 최대 길이(${LASER_MAX} m)에 닿았어요. 손을 떼면 여기까지 쏩니다.`);
+    toast(XMAS ? `루돌프가 한 번에 달릴 수 있는 길이(${LASER_MAX} m)에 닿았어요. 손을 떼면 여기까지 달립니다.` : `레이저 최대 길이(${LASER_MAX} m)에 닿았어요. 손을 떼면 여기까지 쏩니다.`);
     showLaserPath(laserDraw.pts);
     return;
   }
@@ -3801,10 +4513,13 @@ function toast(text) {
   toastTimer = setTimeout(() => { el.classList.add('fade'); toastTimer = setTimeout(() => { el.hidden = true; }, 500); }, 2600);
 }
 const TOOL_TIPS = { pepero: '누른 곳에 거대한 빼빼로를 던져 꽂습니다. 아래 막대로 크기를 고르세요. ×2부터는 건물을 꿰뚫고 무너뜨립니다.', laser: '끌어서 선을 그으면 그 선을 따라 자릅니다. 톡 누르면 한 점만 태웁니다.', meteor: '누른 곳에 운석이 떨어집니다.', quake: '누른 곳이 진원이 됩니다. 아래 막대로 세기를 고르세요.', bat: '아래 막대로 배트 크기를 고르세요. 70 m 넘게 날리면 홈런입니다.' };
-const pepNew = document.querySelector('.tool[data-tool="pepero"] .new');
+if (XMAS) Object.assign(TOOL_TIPS, { bomb: '눈덩이와 트리 장식을 던집니다. 반은 눈덩이, 반은 유리 장식이에요.', bat: '아래 막대로 캔디케인 크기를 고르세요. 70 m 넘게 날리면 홈런입니다.',
+  meteor: '누른 곳에 거대한 눈사람이 떨어집니다.', laser: '끌어서 길을 그리면 루돌프가 하늘에서 내려와 그 길을 따라 돌진합니다. 톡 누르면 그 자리를 들이받아요.', pepero: '누른 곳에 거대한 트리를 던져 꽂습니다. 땅에 꽂히면 똑바로 섭니다. ×2부터는 건물을 꿰뚫고 무너뜨립니다.' });
+const NEW_TOOL = XMAS ? 'laser' : 'pepero', NEW_KEY = XMAS ? 'smash-deer-seen' : 'smash-pep-seen';
+const pepNew = document.querySelector(`.tool[data-tool="${NEW_TOOL}"] .new`);
 function setTool(t) {
   if (t !== tool && TOOL_TIPS[t]) toast(TOOL_TIPS[t]);
-  if (t === 'pepero' && pepNew && !pepNew.hidden) { pepNew.hidden = true; store('smash-pep-seen', 1); }
+  if (t === NEW_TOOL && pepNew && !pepNew.hidden) { pepNew.hidden = true; store(NEW_KEY, 1); }
   tool = t;
   document.querySelectorAll('.tool').forEach((el) => el.setAttribute('aria-checked', String(el.dataset.tool === t)));
   reticle.scale.setScalar(TOOLS[t].r);
@@ -3834,11 +4549,11 @@ function setPepSize(k) {
   TOOLS.pepero.r = 3.4 * pepSize;
   if (tool === 'pepero') reticle.scale.setScalar(TOOLS.pepero.r);
   $('pep-size').value = String(pepSize);
-  $('pep-size-out').textContent = `×${pepSize.toFixed(2).replace(/\.?0+$/, '')} · 길이 ${Math.round(PEP_L * pepSize)} m${pepSize >= PEP_PIERCE ? ' · 관통' : ''}`;
+  $('pep-size-out').textContent = `×${pepSize.toFixed(2).replace(/\.?0+$/, '')} · ${XMAS ? '높이' : '길이'} ${Math.round(PEP_L * pepSize)} m${pepSize >= PEP_PIERCE ? ' · 관통' : ''}`;
 }
 $('pep-size').addEventListener('input', (e) => { setPepSize(parseFloat(e.target.value)); store('smash-pep', pepSize); });
 setPepSize(parseFloat(recall('smash-pep')) || 1);
-if (pepNew && recall('smash-pep-seen')) pepNew.hidden = true;
+if (pepNew && recall(NEW_KEY)) pepNew.hidden = true;
 setBatSize(parseFloat(recall('smash-bat')) || 1);
 setQuakeMag(parseFloat(recall('smash-quake')) || 9);
 document.querySelectorAll('.tool').forEach((el) => el.addEventListener('click', () => setTool(el.dataset.tool)));
@@ -3917,6 +4632,7 @@ const LOOK = {
   day: { hs: 0xdde8f4, hg: 0x6f6655, hi: 0.45, sc: 0xfff0dc, si: 3.6, fog: 0xc4d3e2, ex: 0.62 },
   night: { hs: 0x33467a, hg: 0x0c0c12, hi: 0.55, sc: 0x9fb4ff, si: 0.7, fog: 0x0c1324, ex: 0.85 },
 };
+if (XMAS) { Object.assign(LOOK.day, { hs: 0xe2eaf4, hg: 0x8a8e96, hi: 0.5, sc: 0xfff4e8, si: 3.1, fog: 0xcad3dd }); Object.assign(LOOK.night, { hg: 0x2a3040, hi: 0.62 }); }
 let night = false;
 function setNight(on) {
   night = on;
@@ -3926,10 +4642,11 @@ function setNight(on) {
   fogBase.set(m.fog); scene.fog.color.copy(fogBase);
   expoBase = m.ex;
   scene.environment = on ? envNight : envDay;
-  su.sunPosition.value.copy(on ? nightSunPos : sunDir); su.rayleigh.value = on ? 0.35 : 1.1; su.turbidity.value = on ? 1.2 : 3.2;
+  su.sunPosition.value.copy(on ? nightSunPos : sunDir); su.rayleigh.value = on ? 0.35 : XMAS ? 0.75 : 1.1; su.turbidity.value = on ? 1.2 : XMAS ? 6 : 3.2;
   stars.visible = moon.visible = on;
   for (const l of lampGlow) l.visible = on;
   NIGHT.uNight.value = on ? 1 : 0;
+  if (snowFall) snowFall.night(on);
   appEl.classList.toggle('night', on);
   $('t-night').setAttribute('aria-pressed', String(on));
 }
@@ -4314,7 +5031,7 @@ for (const ev of ['pointerdown', 'pointermove', 'pointerup', 'wheel', 'keydown',
 function sceneBusy(now) {
   if (bombs.length || fx.length || swings.length || quake || laserBeam || laserDraw || cine || rewind || anim || shockAt || pepBusy()) return true;
   if (trauma > 0.001 || hitStop > 0 || expoBoost > 0 || expoDip > 0 || fogHeat > 0 || glowBase > 0 || maxDig > 60) return true;
-  if (dust.n || smoke.n || sparks.n) return true;
+  if (dust.n || smoke.n || sparks.n || (SNOWBITS && SNOWBITS.n)) return true;
   for (const p of dyn) if (!p.sleep) return true;
   return false;
 }
@@ -4331,6 +5048,7 @@ function simulate(rdt, now) {
   if (quake) updateQuake(dt);
   updateSwings(dt);
   updateSystem(dust, dt); updateSystem(smoke, dt); updateSystem(sparks, dt);
+  if (SNOWBITS) updateSystem(SNOWBITS, dt);
   updateFx(dt);
   if (expoBoost > 0) { expoBoost = Math.max(0, expoBoost - rdt * 1.3); }
   if (expoDip > 0 && !(laserBeam && laserBeam.phase === 'charge')) expoDip = Math.max(0, expoDip - rdt * 2);
@@ -4370,11 +5088,12 @@ function frame(now) {
   simulate(rdt, now);
   tickStyle(rdt, now);
   tUni.uTime.value = now / 1000;
+  if (snowFall) snowFall.update(rdt);
   if (glowBase > 0) glowLight.intensity = glowBase * (0.85 + 0.15 * Math.sin(now * 0.006) * Math.sin(now * 0.0023 + 1));
   if (hoverEv) { hover(hoverEv); hoverEv = null; }
   const live = sceneBusy(now);
   const moved = !camPos.equals(camera.position) || !camQ.equals(camera.quaternion) || camera.fov !== camFov;
-  if (!live && !moved && !shadowDirty && now >= kickUntil && now - lastDraw < 1000 && !lockDraw) { if (fpsEl) tickFps(realDt, false); updateLabels(); requestAnimationFrame(frame); return; }
+  if (!live && !moved && !shadowDirty && now >= kickUntil && now - lastDraw < (snowFall && snowFall.on ? 33 : 1000) && !lockDraw) { if (fpsEl) tickFps(realDt, false); updateLabels(); requestAnimationFrame(frame); return; }
   camPos.copy(camera.position); camQ.copy(camera.quaternion); camFov = camera.fov; lastDraw = now;
   if (live || shadowDirty) { renderer.shadowMap.needsUpdate = true; shadowDirty = false; }
   if (trauma > 0.001) {
