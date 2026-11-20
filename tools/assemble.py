@@ -74,5 +74,14 @@ doc = f"""<!doctype html>
 </body>
 </html>
 """
+# 캠퍼스 정보 창(tools/about.py): 검색 로봇이 읽는 학교 소개. data/about.json(허브에서 계산한 지역·가까운 캠퍼스)이 있을 때만
+if (root / "data" / "about.json").exists():
+    import sys
+    sys.path.insert(0, str(root / "tools"))
+    import about
+    a_css, a_btn, a_sec = about.render(cfg, data, json.loads((root / "data" / "about.json").read_text(encoding="utf-8")))   # data: 뺄 건물을 뺀 뒤
+    assert doc.count("다른 학교</a></header>") == 1 and doc.count("</head>") == 1 and doc.count("</body>") == 1
+    doc = (doc.replace("</head>", a_css + "</head>", 1).replace("다른 학교</a></header>", "다른 학교</a>" + a_btn + "</header>", 1)
+           .replace("</body>", a_sec + "</body>", 1))
 (root / "site" / "index.html").write_text(doc, encoding="utf-8")
 print("site/index.html", len(doc.encode()) // 1024, "KB")

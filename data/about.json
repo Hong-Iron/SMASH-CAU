@@ -1,0 +1,34 @@
+{
+ "region": "서울 동작구 흑석동",
+ "nameEn": "Chung-Ang University",
+ "added": "2026-10-15",
+ "rank": 96,
+ "total": 337,
+ "nearby": [
+  {
+   "code": "SSU",
+   "campus": "숭실대학교 캠퍼스",
+   "km": 1.0
+  },
+  {
+   "code": "CHONGSHIN",
+   "campus": "총신대학교 사당캠퍼스",
+   "km": 2.0
+  },
+  {
+   "code": "CUK-SONGEUI",
+   "campus": "가톨릭대학교 성의교정",
+   "km": 4.3
+  },
+  {
+   "code": "BAU",
+   "campus": "백석예술대학교",
+   "km": 4.4
+  },
+  {
+   "code": "SOOKMYUNG",
+   "campus": "숙명여자대학교",
+   "km": 4.6
+  }
+ ]
+}
